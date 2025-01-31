@@ -23,4 +23,4 @@ CI = "https://github.com/simonw/llm-anthropic/actions"
 anthropic = "llm_anthropic"
 
 [project.optional-dependencies]
-test = ["pytest", "pytest-recording", "pytest-asyncio"]
+test = ["pytest", "pytest-recording", "pytest-asyncio", "cogapp"]
