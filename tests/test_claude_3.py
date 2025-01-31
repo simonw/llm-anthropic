@@ -79,18 +79,14 @@ def test_image_prompt():
     response_dict = response.response_json
     response_dict.pop("id")  # differs between requests
     assert response_dict == {
-        "content": [
-            {
-                "text": EXPECTED_IMAGE_TEXT,
-                "type": "text",
-            }
-        ],
+        "content": [{"citations": None, "text": EXPECTED_IMAGE_TEXT, "type": "text"}],
         "model": "claude-3-5-sonnet-20241022",
         "role": "assistant",
         "stop_reason": "end_turn",
         "stop_sequence": None,
         "type": "message",
     }
+
     assert response.input_tokens == 76
     assert response.output_tokens == 75
     assert response.token_details is None
