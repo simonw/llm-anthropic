@@ -147,7 +147,7 @@ When using the Python API, pass a string or an array of strings:
 response = llm.query(
     model="claude-3.5-sonnet",
     query="Fun facts about pelicans",
-    stop_sequences = ["beak", "feathers"],
+    stop_sequences=["beak", "feathers"],
 )
 ```
 
