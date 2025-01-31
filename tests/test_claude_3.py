@@ -94,3 +94,32 @@ def test_image_prompt():
     assert response.input_tokens == 76
     assert response.output_tokens == 75
     assert response.token_details is None
+
+
+@pytest.mark.vcr
+def test_prompt_with_prefill_and_stop_sequences():
+    model = llm.get_model("claude-3.5-haiku")
+    model.key = model.key or ANTHROPIC_API_KEY
+    response = model.prompt(
+        "Very short function describing a pelican",
+        prefill="```python",
+        stop_sequences=["```"],
+        hide_prefill=True,
+    )
+    text = response.text()
+    assert text.startswith(
+        "\ndef describe_pelican():\n"
+        '    """\n'
+        "    A function describing the characteristics of a pelican.\n"
+        "    \n"
+        "    Returns:\n"
+        "        A dictionary with various details about pelicans.\n"
+        '    """\n'
+        "    pelican_details = {\n"
+        '        "species": "Pelecanus",\n'
+        '        "habitat": "Coastal areas, lakes, and rivers",\n'
+    )
+    assert text.endswith(
+        'print("Distinctive Features:", '
+        'pelican_info["physical_characteristics"]["distinctive_features"])\n'
+    )
