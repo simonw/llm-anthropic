@@ -1,7 +1,8 @@
 from anthropic import Anthropic, AsyncAnthropic
 import llm
+import json
 from pydantic import Field, field_validator, model_validator
-from typing import Optional, List
+from typing import Optional, List, Union
 
 
 @llm.hookimpl
@@ -73,6 +74,44 @@ class ClaudeOptions(llm.Options):
         default=None,
     )
 
+    prefill: Optional[str] = Field(
+        description="A prefill to use for the response",
+        default=None,
+    )
+
+    hide_prefill: Optional[bool] = Field(
+        description="Do not repeat the prefill value at the start of the response",
+        default=None,
+    )
+
+    stop_sequences: Optional[Union[list, str]] = Field(
+        description=(
+            "Custom text sequences that will cause the model to stop generating - "
+            "pass either a list of strings or a single string"
+        ),
+        default=None,
+    )
+
+    @field_validator("stop_sequences")
+    def validate_stop_sequences(cls, stop_sequences):
+        error_msg = "stop_sequences must be a list of strings or a single string"
+        if isinstance(stop_sequences, str):
+            try:
+                stop_sequences = json.loads(stop_sequences)
+                if not isinstance(stop_sequences, list) or not all(
+                    isinstance(seq, str) for seq in stop_sequences
+                ):
+                    raise ValueError(error_msg)
+                return stop_sequences
+            except json.JSONDecodeError:
+                return [stop_sequences]
+        elif isinstance(stop_sequences, list):
+            if not all(isinstance(seq, str) for seq in stop_sequences):
+                raise ValueError(error_msg)
+            return stop_sequences
+        else:
+            raise ValueError(error_msg)
+
     @field_validator("max_tokens")
     @classmethod
     def validate_max_tokens(cls, max_tokens):
@@ -129,7 +168,7 @@ class _Shared:
         supports_images=True,
         supports_pdf=False,
     ):
-        self.model_id = 'anthropic/' + model_id
+        self.model_id = "anthropic/" + model_id
         self.claude_model_id = claude_model_id or model_id
         self.attachment_types = set()
         if supports_images:
@@ -143,6 +182,11 @@ class _Shared:
             )
         if supports_pdf:
             self.attachment_types.add("application/pdf")
+
+    def prefill_text(self, prompt):
+        if prompt.options.prefill and not prompt.options.hide_prefill:
+            return prompt.options.prefill
+        return ""
 
     def build_messages(self, prompt, conversation) -> List[dict]:
         messages = []
@@ -201,6 +245,8 @@ class _Shared:
             )
         else:
             messages.append({"role": "user", "content": prompt.prompt})
+        if prompt.options.prefill:
+            messages.append({"role": "assistant", "content": prompt.options.prefill})
         return messages
 
     def build_kwargs(self, prompt, conversation):
@@ -223,6 +269,9 @@ class _Shared:
         if prompt.system:
             kwargs["system"] = prompt.system
 
+        if prompt.options.stop_sequences:
+            kwargs["stop_sequences"] = prompt.options.stop_sequences
+
         return kwargs
 
     def set_usage(self, response):
@@ -241,15 +290,19 @@ class ClaudeMessages(_Shared, llm.Model):
     def execute(self, prompt, stream, response, conversation):
         client = Anthropic(api_key=self.get_key())
         kwargs = self.build_kwargs(prompt, conversation)
+        prefill_text = self.prefill_text(prompt)
         if stream:
             with client.messages.stream(**kwargs) as stream:
+                if prefill_text:
+                    yield prefill_text
                 for text in stream.text_stream:
                     yield text
                 # This records usage and other data:
                 response.response_json = stream.get_final_message().model_dump()
         else:
             completion = client.messages.create(**kwargs)
-            yield completion.content[0].text
+            text = completion.content[0].text
+            yield prefill_text + text
             response.response_json = completion.model_dump()
         self.set_usage(response)
 
@@ -263,14 +316,18 @@ class AsyncClaudeMessages(_Shared, llm.AsyncModel):
     async def execute(self, prompt, stream, response, conversation):
         client = AsyncAnthropic(api_key=self.get_key())
         kwargs = self.build_kwargs(prompt, conversation)
+        prefill_text = self.prefill_text(prompt)
         if stream:
             async with client.messages.stream(**kwargs) as stream_obj:
+                if prefill_text:
+                    yield prefill_text
                 async for text in stream_obj.text_stream:
                     yield text
             response.response_json = (await stream_obj.get_final_message()).model_dump()
         else:
             completion = await client.messages.create(**kwargs)
-            yield completion.content[0].text
+            text = completion.content[0].text
+            yield prefill_text + text
             response.response_json = completion.model_dump()
         self.set_usage(response)
 

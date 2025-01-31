@@ -24,7 +24,7 @@ def test_prompt():
     response_dict = dict(response.response_json)
     response_dict.pop("id")  # differs between requests
     assert response_dict == {
-        "content": [{"text": "1. Pelly\n2. Beaky", "type": "text"}],
+        "content": [{"citations": None, "text": "1. Pelly\n2. Beaky", "type": "text"}],
         "model": "claude-3-opus-20240229",
         "role": "assistant",
         "stop_reason": "end_turn",
@@ -46,7 +46,7 @@ async def test_async_prompt():
     response_dict = dict(response.response_json)
     response_dict.pop("id")  # differs between requests
     assert response_dict == {
-        "content": [{"text": "1. Pelly\n2. Beaky", "type": "text"}],
+        "content": [{"citations": None, "text": "1. Pelly\n2. Beaky", "type": "text"}],
         "model": "claude-3-opus-20240229",
         "role": "assistant",
         "stop_reason": "end_turn",
@@ -79,18 +79,43 @@ def test_image_prompt():
     response_dict = response.response_json
     response_dict.pop("id")  # differs between requests
     assert response_dict == {
-        "content": [
-            {
-                "text": EXPECTED_IMAGE_TEXT,
-                "type": "text",
-            }
-        ],
+        "content": [{"citations": None, "text": EXPECTED_IMAGE_TEXT, "type": "text"}],
         "model": "claude-3-5-sonnet-20241022",
         "role": "assistant",
         "stop_reason": "end_turn",
         "stop_sequence": None,
         "type": "message",
     }
+
     assert response.input_tokens == 76
     assert response.output_tokens == 75
     assert response.token_details is None
+
+
+@pytest.mark.vcr
+def test_prompt_with_prefill_and_stop_sequences():
+    model = llm.get_model("claude-3.5-haiku")
+    model.key = model.key or ANTHROPIC_API_KEY
+    response = model.prompt(
+        "Very short function describing a pelican",
+        prefill="```python",
+        stop_sequences=["```"],
+        hide_prefill=True,
+    )
+    text = response.text()
+    assert text.startswith(
+        "\ndef describe_pelican():\n"
+        '    """\n'
+        "    A function describing the characteristics of a pelican.\n"
+        "    \n"
+        "    Returns:\n"
+        "        A dictionary with various details about pelicans.\n"
+        '    """\n'
+        "    pelican_details = {\n"
+        '        "species": "Pelecanus",\n'
+        '        "habitat": "Coastal areas, lakes, and rivers",\n'
+    )
+    assert text.endswith(
+        'print("Distinctive Features:", '
+        'pelican_info["physical_characteristics"]["distinctive_features"])\n'
+    )
