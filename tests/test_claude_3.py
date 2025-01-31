@@ -24,7 +24,7 @@ def test_prompt():
     response_dict = dict(response.response_json)
     response_dict.pop("id")  # differs between requests
     assert response_dict == {
-        "content": [{"text": "1. Pelly\n2. Beaky", "type": "text"}],
+        "content": [{"citations": None, "text": "1. Pelly\n2. Beaky", "type": "text"}],
         "model": "claude-3-opus-20240229",
         "role": "assistant",
         "stop_reason": "end_turn",
@@ -46,7 +46,7 @@ async def test_async_prompt():
     response_dict = dict(response.response_json)
     response_dict.pop("id")  # differs between requests
     assert response_dict == {
-        "content": [{"text": "1. Pelly\n2. Beaky", "type": "text"}],
+        "content": [{"citations": None, "text": "1. Pelly\n2. Beaky", "type": "text"}],
         "model": "claude-3-opus-20240229",
         "role": "assistant",
         "stop_reason": "end_turn",
