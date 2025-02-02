@@ -14,13 +14,21 @@ Install this plugin in the same environment as [LLM](https://llm.datasette.io/).
 llm install llm-anthropic
 ```
 
-### Upgrading from llm-claude-3
+<details><summary>Instructions for users who need to upgrade from <code>llm-claude-3</code></summary>
 
-If you previously used `llm-claude-3` everything should work exactly the same using this plugin, except you'll need to set the `anthropic` key to whatever value you previously used for the `claude` key. You can do that like this:
+<br>
+
+If you previously used `llm-claude-3` you can upgrade like this:
 
 ```bash
+llm install -U llm-claude-3
 llm keys set anthropic --value "$(llm keys get claude)"
 ```
+The first line will remove the previous `llm-claude-3` version and install this one, because the latest `llm-claude-3` depends on `llm-anthropic`.
+
+The second line sets the `anthropic` key to whatever value you previously used for the `claude` key.
+
+</details>
 
 ## Usage
 
