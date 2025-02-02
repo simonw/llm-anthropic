@@ -14,6 +14,14 @@ Install this plugin in the same environment as [LLM](https://llm.datasette.io/).
 llm install llm-anthropic
 ```
 
+### Upgrading from llm-claude-3
+
+If you previously used `llm-claude-3` everything should work exactly the same using this plugin, except you'll need to set the `anthropic` key to whatever value you previously used for the `claude` key. You can do that like this:
+
+```bash
+llm keys set anthropic --value "$(llm keys get claude)"
+```
+
 ## Usage
 
 First, set [an API key](https://console.anthropic.com/settings/keys) for Anthropic:
