@@ -44,18 +44,18 @@ Run `llm models` to list the models, and `llm models --options` to include a lis
 
 Run prompts like this:
 ```bash
-llm -m anthropic/claude-3.5-sonnet 'Fun facts about pelicans'
-llm -m anthropic/claude-3.5-haiku 'Fun facts about armadillos'
-llm -m anthropic/claude-3-opus 'Fun facts about squirrels'
+llm -m claude-3.5-sonnet 'Fun facts about pelicans'
+llm -m claude-3.5-haiku 'Fun facts about armadillos'
+llm -m claude-3-opus 'Fun facts about squirrels'
 ```
 Images are supported too, for models other than Claude 3.5 Haiku:
 ```bash
-llm -m anthropic/claude-3.5-sonnet 'describe this image' -a https://static.simonwillison.net/static/2024/pelicans.jpg
-llm -m anthropic/claude-3-haiku 'extract text' -a page.png
+llm -m claude-3.5-sonnet 'describe this image' -a https://static.simonwillison.net/static/2024/pelicans.jpg
+llm -m claude-3-haiku 'extract text' -a page.png
 ```
 Claude 3.5 Sonnet can handle PDF files:
 ```bash
-llm -m anthropic/claude-3.5-sonnet 'extract text' -a page.pdf
+llm -m claude-3.5-sonnet 'extract text' -a page.pdf
 ```
 The plugin sets up `claude-3.5-sonnet` and similar as aliases, usable like this:
 ```bash
