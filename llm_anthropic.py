@@ -285,10 +285,10 @@ class _Shared:
         return "Anthropic Messages: {}".format(self.model_id)
 
 
-class ClaudeMessages(_Shared, llm.Model):
+class ClaudeMessages(_Shared, llm.KeyModel):
 
-    def execute(self, prompt, stream, response, conversation):
-        client = Anthropic(api_key=self.get_key())
+    def execute(self, prompt, stream, response, conversation, key):
+        client = Anthropic(api_key=self.get_key(key))
         kwargs = self.build_kwargs(prompt, conversation)
         prefill_text = self.prefill_text(prompt)
         if stream:
@@ -312,9 +312,9 @@ class ClaudeMessagesLong(ClaudeMessages):
         max_tokens: Optional[int] = long_field
 
 
-class AsyncClaudeMessages(_Shared, llm.AsyncModel):
-    async def execute(self, prompt, stream, response, conversation):
-        client = AsyncAnthropic(api_key=self.get_key())
+class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
+    async def execute(self, prompt, stream, response, conversation, key):
+        client = AsyncAnthropic(api_key=self.get_key(key))
         kwargs = self.build_kwargs(prompt, conversation)
         prefill_text = self.prefill_text(prompt)
         if stream:
