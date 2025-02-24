@@ -304,40 +304,49 @@ class _Shared:
         return "Anthropic Messages: {}".format(self.model_id)
 
 
+class Streamer:
+    def __init__(self, supports_thinking, options):
+        self.was_thinking = False
+        self.show_thinking = supports_thinking and options.show_thinking
+        self.thinking_delimiter = (
+            options.thinking_delimiter
+            if (supports_thinking and options.thinking_delimiter is not None)
+            else DEFAULT_THINKING_DELIMITER
+        )
+
+    def process(self, chunk):
+        "Returns something to yield or None"
+        if chunk.type == "content_block_delta" and chunk.delta.type == "text_delta":
+            to_yield = ""
+            if self.was_thinking:
+                self.was_thinking = False
+                to_yield += self.thinking_delimiter
+            to_yield += chunk.delta.text
+            return to_yield
+        elif self.show_thinking and (
+            chunk.type == "content_block_delta" and chunk.delta.type == "thinking_delta"
+        ):
+            self.was_thinking = True
+            return chunk.delta.thinking
+
+
 class ClaudeMessages(_Shared, llm.KeyModel):
     def execute(self, prompt, stream, response, conversation, key):
         client = Anthropic(api_key=self.get_key(key))
         kwargs = self.build_kwargs(prompt, conversation)
         prefill_text = self.prefill_text(prompt)
-        thinking_delimiter = (
-            prompt.options.thinking_delimiter if self.supports_thinking else None
-        )
-        if thinking_delimiter is None:
-            thinking_delimiter = DEFAULT_THINKING_DELIMITER
         if stream:
-            was_thinking = False
+            streamer = Streamer(
+                supports_thinking=self.supports_thinking,
+                options=prompt.options,
+            )
             with client.messages.stream(**kwargs) as stream:
                 if prefill_text:
                     yield prefill_text
                 for chunk in stream:
-                    if (
-                        chunk.type == "content_block_delta"
-                        and chunk.delta.type == "text_delta"
-                    ):
-                        if was_thinking:
-                            was_thinking = False
-                            yield thinking_delimiter
-                        yield chunk.delta.text
-                    elif (
-                        self.supports_thinking
-                        and prompt.options.show_thinking
-                        and (
-                            chunk.type == "content_block_delta"
-                            and chunk.delta.type == "thinking_delta"
-                        )
-                    ):
-                        was_thinking = True
-                        yield chunk.delta.thinking
+                    output = streamer.process(chunk)
+                    if output is not None:
+                        yield output
                 # This records usage and other data:
                 response.response_json = stream.get_final_message().model_dump()
         else:
@@ -366,11 +375,17 @@ class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
         kwargs = self.build_kwargs(prompt, conversation)
         prefill_text = self.prefill_text(prompt)
         if stream:
+            streamer = Streamer(
+                supports_thinking=self.supports_thinking,
+                options=prompt.options,
+            )
             async with client.messages.stream(**kwargs) as stream_obj:
                 if prefill_text:
                     yield prefill_text
-                async for text in stream_obj.text_stream:
-                    yield text
+                async for chunk in stream_obj:
+                    output = streamer.process(chunk)
+                    if output is not None:
+                        yield output
             response.response_json = (await stream_obj.get_final_message()).model_dump()
         else:
             completion = await client.messages.create(**kwargs)
