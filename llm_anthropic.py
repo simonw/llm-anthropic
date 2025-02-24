@@ -380,6 +380,7 @@ class AsyncClaudeMessagesLong(AsyncClaudeMessages):
 
 
 class ClaudeOptionsWithThinking(ClaudeOptions):
+    max_tokens: Optional[int] = long_field
     thinking: Optional[bool] = Field(
         description="Enable thinking mode",
         default=None,
