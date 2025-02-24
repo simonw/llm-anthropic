@@ -309,7 +309,7 @@ class ClaudeMessages(_Shared, llm.KeyModel):
         client = Anthropic(api_key=self.get_key(key))
         kwargs = self.build_kwargs(prompt, conversation)
         prefill_text = self.prefill_text(prompt)
-        thinking_delimiter = prompt.options.thinking_delimiter
+        thinking_delimiter = prompt.options.thinking_delimiter if self.supports_thinking else None
         if thinking_delimiter is None:
             thinking_delimiter = DEFAULT_THINKING_DELIMITER
         if stream:
@@ -326,7 +326,7 @@ class ClaudeMessages(_Shared, llm.KeyModel):
                             was_thinking = False
                             yield thinking_delimiter
                         yield chunk.delta.text
-                    elif prompt.options.show_thinking and (
+                    elif self.supports_thinking and prompt.options.show_thinking and (
                         chunk.type == "content_block_delta"
                         and chunk.delta.type == "thinking_delta"
                     ):
