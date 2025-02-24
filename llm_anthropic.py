@@ -4,6 +4,9 @@ import json
 from pydantic import Field, field_validator, model_validator
 from typing import Optional, List, Union
 
+DEFAULT_THINKING_TOKENS = 1024
+DEFAULT_THINKING_DELIMITER = "\n\n"
+
 
 @llm.hookimpl
 def register_models(register):
@@ -11,7 +14,7 @@ def register_models(register):
     register(
         ClaudeMessages("claude-3-opus-20240229"),
         AsyncClaudeMessages("claude-3-opus-20240229"),
-    ),
+    )
     register(
         ClaudeMessages("claude-3-opus-latest"),
         AsyncClaudeMessages("claude-3-opus-latest"),
@@ -45,6 +48,11 @@ def register_models(register):
         ClaudeMessagesLong("claude-3-5-haiku-latest", supports_images=False),
         AsyncClaudeMessagesLong("claude-3-5-haiku-latest", supports_images=False),
         aliases=("claude-3.5-haiku",),
+    )
+    register(
+        ClaudeMessagesThinking("claude-3-7-sonnet-20250219", supports_images=True),
+        AsyncClaudeMessagesThinking("claude-3-7-sonnet-20250219", supports_images=True),
+        aliases=("claude-3.7-sonnet",),
     )
 
 
@@ -159,6 +167,8 @@ class _Shared:
     key_env_var = "ANTHROPIC_API_KEY"
     can_stream = True
 
+    supports_thinking = False
+
     class Options(ClaudeOptions): ...
 
     def __init__(
@@ -255,6 +265,15 @@ class _Shared:
             "messages": self.build_messages(prompt, conversation),
             "max_tokens": prompt.options.max_tokens,
         }
+        if self.supports_thinking and (
+            prompt.options.show_thinking or prompt.options.thinking_budget
+        ):
+            prompt.options.thinking = True
+        if self.supports_thinking and prompt.options.thinking:
+            budget_tokens = prompt.options.thinking_budget or DEFAULT_THINKING_TOKENS
+            kwargs["extra_body"] = {
+                "thinking": {"type": "enabled", "budget_tokens": budget_tokens}
+            }
         if prompt.options.user_id:
             kwargs["metadata"] = {"user_id": prompt.options.user_id}
 
@@ -286,22 +305,45 @@ class _Shared:
 
 
 class ClaudeMessages(_Shared, llm.KeyModel):
-
     def execute(self, prompt, stream, response, conversation, key):
         client = Anthropic(api_key=self.get_key(key))
         kwargs = self.build_kwargs(prompt, conversation)
         prefill_text = self.prefill_text(prompt)
+        thinking_delimiter = prompt.options.thinking_delimiter
+        if thinking_delimiter is None:
+            thinking_delimiter = DEFAULT_THINKING_DELIMITER
         if stream:
+            was_thinking = False
             with client.messages.stream(**kwargs) as stream:
                 if prefill_text:
                     yield prefill_text
-                for text in stream.text_stream:
-                    yield text
+                for chunk in stream:
+                    if (
+                        chunk.type == "content_block_delta"
+                        and chunk.delta.type == "text_delta"
+                    ):
+                        if was_thinking:
+                            was_thinking = False
+                            yield thinking_delimiter
+                        yield chunk.delta.text
+                    elif prompt.options.show_thinking and (
+                        chunk.type == "content_block_delta"
+                        and chunk.delta.type == "thinking_delta"
+                    ):
+                        was_thinking = True
+                        yield chunk.delta.thinking
                 # This records usage and other data:
                 response.response_json = stream.get_final_message().model_dump()
         else:
             completion = client.messages.create(**kwargs)
-            text = completion.content[0].text
+            # Might be more than one item in completion.content, including thinking blocks
+            text_bits = []
+            for item in completion.content:
+                if hasattr(item, "thinking"):
+                    text_bits.append(item.thinking)
+                else:
+                    text_bits.append(item.text)
+            text = "\n".join(text_bits)
             yield prefill_text + text
             response.response_json = completion.model_dump()
         self.set_usage(response)
@@ -335,3 +377,32 @@ class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
 class AsyncClaudeMessagesLong(AsyncClaudeMessages):
     class Options(ClaudeOptions):
         max_tokens: Optional[int] = long_field
+
+
+class ClaudeOptionsWithThinking(ClaudeOptions):
+    thinking: Optional[bool] = Field(
+        description="Enable thinking mode",
+        default=None,
+    )
+    thinking_budget: Optional[int] = Field(
+        description="Number of tokens to budget for thinking", default=None
+    )
+    show_thinking: Optional[bool] = Field(
+        description="Include thinking text in the output", default=None
+    )
+    thinking_delimiter: Optional[str] = Field(
+        description="Text to use between thinking and text output (defaults to two newlines)",
+        default=None,
+    )
+
+
+class ClaudeMessagesThinking(ClaudeMessages):
+    supports_thinking = True
+
+    class Options(ClaudeOptionsWithThinking): ...
+
+
+class AsyncClaudeMessagesThinking(AsyncClaudeMessages):
+    supports_thinking = True
+
+    class Options(ClaudeOptionsWithThinking): ...

@@ -10,7 +10,7 @@ classifiers = [
 ]
 dependencies = [
     "llm>=0.22",
-    "anthropic>=0.45.2",
+    "anthropic>=0.47.0",
 ]
 
 [project.urls]
