@@ -5,6 +5,7 @@ from pydantic import Field, field_validator, model_validator
 from typing import Optional, List, Union
 
 DEFAULT_THINKING_TOKENS = 1024
+DEFAULT_TEMPERATURE = 1.0
 
 
 @llm.hookimpl
@@ -96,7 +97,7 @@ class ClaudeOptions(llm.Options):
 
     temperature: Optional[float] = Field(
         description="Amount of randomness injected into the response. Defaults to 1.0. Ranges from 0.0 to 1.0. Use temperature closer to 0.0 for analytical / multiple choice, and closer to 1.0 for creative and generative tasks. Note that even with temperature of 0.0, the results will not be fully deterministic.",
-        default=1.0,
+        default=None,
     )
 
     top_p: Optional[float] = Field(
@@ -292,7 +293,11 @@ class _Shared:
         if prompt.options.top_p:
             kwargs["top_p"] = prompt.options.top_p
         else:
-            kwargs["temperature"] = prompt.options.temperature
+            kwargs["temperature"] = (
+                prompt.options.temperature
+                if prompt.options.temperature is not None
+                else DEFAULT_TEMPERATURE
+            )
 
         if prompt.options.top_k:
             kwargs["top_k"] = prompt.options.top_k
