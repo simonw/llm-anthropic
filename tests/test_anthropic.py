@@ -123,3 +123,35 @@ def test_prompt_with_prefill_and_stop_sequences():
         'print("Distinctive Features:", '
         'pelican_info["physical_characteristics"]["distinctive_features"])\n'
     )
+
+
+@pytest.mark.vcr
+def test_thinking_prompt():
+    model = llm.get_model("claude-3.7-sonnet")
+    model.key = model.key or ANTHROPIC_API_KEY
+    conversation = model.conversation()
+    response = conversation.prompt(
+        "Two names for a pet pelican, be brief", thinking=True
+    )
+    assert response.text() == "Scoop and Beaky"
+    response_dict = dict(response.response_json)
+    response_dict.pop("id")  # differs between requests
+    assert response_dict == {
+        "content": [
+            {
+                "signature": "EuYBCkQYAiJAZFFuoMD/kqVzMZ887Sa1rJBpa5UU5W+YVHe0PV1dh0T1ZHHOQcSUTMB9iPC6hhduyszf501Ao1McU4sUwlL2UhIM0nyNDklwN6dy0bkUGgx7Ny7JpGHlGJ3+mR8iMHcNBzvnVJwp6XmCs9jieB8BWgth2vmVOuSU+mUYw2bT4pkzVkVsxFnA1lh2T1kjRSpQltDXxi/Pyq3WdD/W4gnV9HIJ4Cb5olNXUrMvKUyoim0MfvyOU7wuyAi7J74CVw0Te6DW8GQf3/1jVYxeMEEBszuSU5IuyxB0BKWW5TfALM0=",
+                "thinking": "The person is asking for two names for a pet pelican, and they want me to be brief in my response. I'll provide two concise, creative names that would suit a pelican:\n\n1. Something that relates to their large beak/pouch\n2. Something that relates to water/fishing\n\nI'll keep my response very short as requested.",
+                "type": "thinking",
+            },
+            {"citations": None, "text": "Scoop and Beaky", "type": "text"},
+        ],
+        "model": "claude-3-7-sonnet-20250219",
+        "role": "assistant",
+        "stop_reason": "end_turn",
+        "stop_sequence": None,
+        "type": "message",
+    }
+
+    assert response.input_tokens == 45
+    assert response.output_tokens == 94
+    assert response.token_details is None

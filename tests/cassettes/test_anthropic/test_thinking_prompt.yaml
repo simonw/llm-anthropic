@@ -1,0 +1,218 @@
+interactions:
+- request:
+    body: '{"max_tokens":8192,"messages":[{"role":"user","content":"Two names for
+      a pet pelican, be brief"}],"model":"claude-3-7-sonnet-latest","temperature":1.0,"thinking":{"type":"enabled","budget_tokens":1024},"stream":true}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      anthropic-version:
+      - '2023-06-01'
+      connection:
+      - keep-alive
+      content-length:
+      - '216'
+      content-type:
+      - application/json
+      host:
+      - api.anthropic.com
+      user-agent:
+      - Anthropic/Python 0.47.0
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 0.47.0
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.12.0
+      x-stainless-stream-helper:
+      - messages
+      x-stainless-timeout:
+      - NOT_GIVEN
+    method: POST
+    uri: https://api.anthropic.com/v1/messages
+  response:
+    body:
+      string: 'event: message_start
+
+        data: {"type":"message_start","message":{"id":"msg_01SNKQD4WaGocVoAVDeL7eZX","type":"message","role":"assistant","model":"claude-3-7-sonnet-20250219","content":[],"stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":45,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":8}}   }
+
+
+        event: content_block_start
+
+        data: {"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":"","signature":""}             }
+
+
+        event: ping
+
+        data: {"type": "ping"}
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"The
+        person is asking for two names"}               }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"
+        for a pet pelican,"}              }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"
+        and they want me to be brief in"}}
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"
+        my response. I''ll provide two concise"}            }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":",
+        creative names that would suit a pelican"}            }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":":\n\n1.
+        Something that relates"}   }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"
+        to their large beak/po"} }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"uch\n2.
+        Something that relates"}             }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"
+        to water/fishing\n\nI"}     }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"''ll
+        keep my response very short"}          }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"
+        as requested."}      }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"signature_delta","signature":"EuYBCkQYAiJAZFFuoMD/kqVzMZ887Sa1rJBpa5UU5W+YVHe0PV1dh0T1ZHHOQcSUTMB9iPC6hhduyszf501Ao1McU4sUwlL2UhIM0nyNDklwN6dy0bkUGgx7Ny7JpGHlGJ3+mR8iMHcNBzvnVJwp6XmCs9jieB8BWgth2vmVOuSU+mUYw2bT4pkzVkVsxFnA1lh2T1kjRSpQltDXxi/Pyq3WdD/W4gnV9HIJ4Cb5olNXUrMvKUyoim0MfvyOU7wuyAi7J74CVw0Te6DW8GQf3/1jVYxeMEEBszuSU5IuyxB0BKWW5TfALM0="}            }
+
+
+        event: content_block_stop
+
+        data: {"type":"content_block_stop","index":0 }
+
+
+        event: content_block_start
+
+        data: {"type":"content_block_start","index":1,"content_block":{"type":"text","text":""}    }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"Scoop
+        and Beaky"}       }
+
+
+        event: content_block_stop
+
+        data: {"type":"content_block_stop","index":1}
+
+
+        event: message_delta
+
+        data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"output_tokens":94}     }
+
+
+        event: message_stop
+
+        data: {"type":"message_stop"      }
+
+
+        '
+    headers:
+      CF-RAY:
+      - 91761666c9b9f79a-LAX
+      Cache-Control:
+      - no-cache
+      Connection:
+      - keep-alive
+      Content-Type:
+      - text/event-stream; charset=utf-8
+      Date:
+      - Tue, 25 Feb 2025 07:47:29 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      X-Robots-Tag:
+      - none
+      anthropic-organization-id:
+      - b320df16-c763-4455-b901-3f7d54e9a012
+      anthropic-ratelimit-input-tokens-limit:
+      - '200000'
+      anthropic-ratelimit-input-tokens-remaining:
+      - '200000'
+      anthropic-ratelimit-input-tokens-reset:
+      - '2025-02-25T07:47:28Z'
+      anthropic-ratelimit-output-tokens-limit:
+      - '80000'
+      anthropic-ratelimit-output-tokens-remaining:
+      - '76000'
+      anthropic-ratelimit-output-tokens-reset:
+      - '2025-02-25T07:47:31Z'
+      anthropic-ratelimit-requests-limit:
+      - '4000'
+      anthropic-ratelimit-requests-remaining:
+      - '3999'
+      anthropic-ratelimit-requests-reset:
+      - '2025-02-25T07:47:28Z'
+      anthropic-ratelimit-tokens-limit:
+      - '280000'
+      anthropic-ratelimit-tokens-remaining:
+      - '276000'
+      anthropic-ratelimit-tokens-reset:
+      - '2025-02-25T07:47:28Z'
+      cf-cache-status:
+      - DYNAMIC
+      request-id:
+      - req_01Xh2DgdnZ2DPE5bACEkXpMG
+      via:
+      - 1.1 google
+    status:
+      code: 200
+      message: OK
+version: 1

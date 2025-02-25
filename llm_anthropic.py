@@ -4,6 +4,8 @@ import json
 from pydantic import Field, field_validator, model_validator
 from typing import Optional, List, Union
 
+DEFAULT_THINKING_TOKENS = 1024
+
 
 @llm.hookimpl
 def register_models(register):
@@ -29,29 +31,67 @@ def register_models(register):
     )
     # 3.5 models
     register(
-        ClaudeMessagesLong("claude-3-5-sonnet-20240620", supports_pdf=True),
-        AsyncClaudeMessagesLong("claude-3-5-sonnet-20240620", supports_pdf=True),
+        ClaudeMessages(
+            "claude-3-5-sonnet-20240620", supports_pdf=True, default_max_tokens=8192
+        ),
+        AsyncClaudeMessages(
+            "claude-3-5-sonnet-20240620", supports_pdf=True, default_max_tokens=8192
+        ),
     )
     register(
-        ClaudeMessagesLong("claude-3-5-sonnet-20241022", supports_pdf=True),
-        AsyncClaudeMessagesLong("claude-3-5-sonnet-20241022", supports_pdf=True),
+        ClaudeMessages(
+            "claude-3-5-sonnet-20241022", supports_pdf=True, default_max_tokens=8192
+        ),
+        AsyncClaudeMessages(
+            "claude-3-5-sonnet-20241022", supports_pdf=True, default_max_tokens=8192
+        ),
     )
     register(
-        ClaudeMessagesLong("claude-3-5-sonnet-latest", supports_pdf=True),
-        AsyncClaudeMessagesLong("claude-3-5-sonnet-latest", supports_pdf=True),
+        ClaudeMessages(
+            "claude-3-5-sonnet-latest", supports_pdf=True, default_max_tokens=8192
+        ),
+        AsyncClaudeMessages(
+            "claude-3-5-sonnet-latest", supports_pdf=True, default_max_tokens=8192
+        ),
         aliases=("claude-3.5-sonnet", "claude-3.5-sonnet-latest"),
     )
     register(
-        ClaudeMessagesLong("claude-3-5-haiku-latest"),
-        AsyncClaudeMessagesLong("claude-3-5-haiku-latest"),
+        ClaudeMessages("claude-3-5-haiku-latest", default_max_tokens=8192),
+        AsyncClaudeMessages("claude-3-5-haiku-latest", default_max_tokens=8192),
         aliases=("claude-3.5-haiku",),
+    )
+    # 3.7
+    register(
+        ClaudeMessagesThinking(
+            "claude-3-7-sonnet-20250219",
+            supports_pdf=True,
+            default_max_tokens=8192,
+        ),
+        AsyncClaudeMessagesThinking(
+            "claude-3-7-sonnet-20250219",
+            supports_pdf=True,
+            default_max_tokens=8192,
+        ),
+    )
+    register(
+        ClaudeMessagesThinking(
+            "claude-3-7-sonnet-latest",
+            supports_pdf=True,
+            default_max_tokens=8192,
+        ),
+        AsyncClaudeMessagesThinking(
+            "claude-3-7-sonnet-latest",
+            supports_pdf=True,
+            default_max_tokens=8192,
+        ),
+        aliases=("claude-3.7-sonnet", "claude-3.7-sonnet-latest"),
     )
 
 
 class ClaudeOptions(llm.Options):
     max_tokens: Optional[int] = Field(
         description="The maximum number of tokens to generate before stopping",
-        default=4_096,
+        default=None,
     )
 
     temperature: Optional[float] = Field(
@@ -112,14 +152,6 @@ class ClaudeOptions(llm.Options):
         else:
             raise ValueError(error_msg)
 
-    @field_validator("max_tokens")
-    @classmethod
-    def validate_max_tokens(cls, max_tokens):
-        real_max = cls.model_fields["max_tokens"].default
-        if not (0 < max_tokens <= real_max):
-            raise ValueError("max_tokens must be in range 1-{}".format(real_max))
-        return max_tokens
-
     @field_validator("temperature")
     @classmethod
     def validate_temperature(cls, temperature):
@@ -148,16 +180,13 @@ class ClaudeOptions(llm.Options):
         return self
 
 
-long_field = Field(
-    description="The maximum number of tokens to generate before stopping",
-    default=4_096 * 2,
-)
-
-
 class _Shared:
     needs_key = "anthropic"
     key_env_var = "ANTHROPIC_API_KEY"
     can_stream = True
+
+    supports_thinking = False
+    default_max_tokens = 4096
 
     class Options(ClaudeOptions): ...
 
@@ -167,6 +196,7 @@ class _Shared:
         claude_model_id=None,
         supports_images=True,
         supports_pdf=False,
+        default_max_tokens=None,
     ):
         self.model_id = "anthropic/" + model_id
         self.claude_model_id = claude_model_id or model_id
@@ -182,6 +212,8 @@ class _Shared:
             )
         if supports_pdf:
             self.attachment_types.add("application/pdf")
+        if default_max_tokens is not None:
+            self.default_max_tokens = default_max_tokens
 
     def prefill_text(self, prompt):
         if prompt.options.prefill and not prompt.options.hide_prefill:
@@ -253,7 +285,6 @@ class _Shared:
         kwargs = {
             "model": self.claude_model_id,
             "messages": self.build_messages(prompt, conversation),
-            "max_tokens": prompt.options.max_tokens,
         }
         if prompt.options.user_id:
             kwargs["metadata"] = {"user_id": prompt.options.user_id}
@@ -271,6 +302,28 @@ class _Shared:
 
         if prompt.options.stop_sequences:
             kwargs["stop_sequences"] = prompt.options.stop_sequences
+
+        if self.supports_thinking and (
+            prompt.options.thinking or prompt.options.thinking_budget
+        ):
+            prompt.options.thinking = True
+            budget_tokens = prompt.options.thinking_budget or DEFAULT_THINKING_TOKENS
+            kwargs["thinking"] = {"type": "enabled", "budget_tokens": budget_tokens}
+
+        max_tokens = self.default_max_tokens
+        if prompt.options.max_tokens is not None:
+            max_tokens = prompt.options.max_tokens
+        if (
+            self.supports_thinking
+            and prompt.options.thinking_budget is not None
+            and prompt.options.thinking_budget > max_tokens
+        ):
+            max_tokens = prompt.options.thinking_budget + 1
+        kwargs["max_tokens"] = max_tokens
+        if max_tokens > 64000:
+            kwargs["betas"] = ["output-128k-2025-02-19"]
+            if "thinking" in kwargs:
+                kwargs["extra_body"] = {"thinking": kwargs.pop("thinking")}
 
         return kwargs
 
@@ -291,8 +344,12 @@ class ClaudeMessages(_Shared, llm.KeyModel):
         client = Anthropic(api_key=self.get_key(key))
         kwargs = self.build_kwargs(prompt, conversation)
         prefill_text = self.prefill_text(prompt)
+        if "betas" in kwargs:
+            messages_client = client.beta.messages
+        else:
+            messages_client = client.messages
         if stream:
-            with client.messages.stream(**kwargs) as stream:
+            with messages_client.stream(**kwargs) as stream:
                 if prefill_text:
                     yield prefill_text
                 for text in stream.text_stream:
@@ -300,38 +357,58 @@ class ClaudeMessages(_Shared, llm.KeyModel):
                 # This records usage and other data:
                 response.response_json = stream.get_final_message().model_dump()
         else:
-            completion = client.messages.create(**kwargs)
-            text = completion.content[0].text
+            completion = messages_client.create(**kwargs)
+            text = "".join(
+                [item.text for item in completion.content if hasattr(item, "text")]
+            )
             yield prefill_text + text
             response.response_json = completion.model_dump()
         self.set_usage(response)
 
 
-class ClaudeMessagesLong(ClaudeMessages):
-    class Options(ClaudeOptions):
-        max_tokens: Optional[int] = long_field
+class ClaudeOptionsWithThinking(ClaudeOptions):
+    thinking: Optional[bool] = Field(
+        description="Enable thinking mode",
+        default=None,
+    )
+    thinking_budget: Optional[int] = Field(
+        description="Number of tokens to budget for thinking", default=None
+    )
+
+
+class ClaudeMessagesThinking(ClaudeMessages):
+    supports_thinking = True
+
+    class Options(ClaudeOptionsWithThinking): ...
 
 
 class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
     async def execute(self, prompt, stream, response, conversation, key):
         client = AsyncAnthropic(api_key=self.get_key(key))
         kwargs = self.build_kwargs(prompt, conversation)
+        if "betas" in kwargs:
+            messages_client = client.beta.messages
+        else:
+            messages_client = client.messages
         prefill_text = self.prefill_text(prompt)
         if stream:
-            async with client.messages.stream(**kwargs) as stream_obj:
+            async with messages_client.stream(**kwargs) as stream_obj:
                 if prefill_text:
                     yield prefill_text
                 async for text in stream_obj.text_stream:
                     yield text
             response.response_json = (await stream_obj.get_final_message()).model_dump()
         else:
-            completion = await client.messages.create(**kwargs)
-            text = completion.content[0].text
+            completion = await messages_client.create(**kwargs)
+            text = "".join(
+                [item.text for item in completion.content if hasattr(item, "text")]
+            )
             yield prefill_text + text
             response.response_json = completion.model_dump()
         self.set_usage(response)
 
 
-class AsyncClaudeMessagesLong(AsyncClaudeMessages):
-    class Options(ClaudeOptions):
-        max_tokens: Optional[int] = long_field
+class AsyncClaudeMessagesThinking(AsyncClaudeMessages):
+    supports_thinking = True
+
+    class Options(ClaudeOptionsWithThinking): ...
