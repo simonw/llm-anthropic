@@ -217,7 +217,7 @@ class _Shared:
                             "role": "user",
                             "content": content,
                         },
-                        {"role": "assistant", "content": response.text()},
+                        {"role": "assistant", "content": response.text_or_raise()},
                     ]
                 )
         if prompt.attachments:
