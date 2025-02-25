@@ -342,7 +342,9 @@ class ClaudeMessages(_Shared, llm.KeyModel):
                 response.response_json = stream.get_final_message().model_dump()
         else:
             completion = client.messages.create(**kwargs)
-            text = completion.content[0].text
+            text = "".join(
+                [item.text for item in completion.content if hasattr(item, "text")]
+            )
             yield prefill_text + text
             response.response_json = completion.model_dump()
         self.set_usage(response)
