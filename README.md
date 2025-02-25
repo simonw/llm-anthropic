@@ -188,10 +188,20 @@ This project uses [pytest-recording](https://github.com/kiwicom/pytest-recording
 
 If you add a new test that calls the API you can capture the API response like this:
 ```bash
-PYTEST_ANTHROPIC_API_KEY="$(llm keys get claude)" pytest --record-mode once
+PYTEST_ANTHROPIC_API_KEY="$(llm keys get anthropic)" pytest --record-mode once
 ```
 You will need to have stored a valid Anthropic API key using this command first:
 ```bash
-llm keys set claude
+llm keys set anthropic
 # Paste key here
+```
+I use the following sequence:
+```bash
+# First delete the relevant cassette if it exists already:
+rm tests/cassettes/test_anthropic/test_thinking_prompt.yaml
+# Run this failing test to recreate the cassette
+PYTEST_ANTHROPIC_API_KEY="$(llm keys get claude)" pytest -k test_thinking_prompt  --record-mode once
+# Now run the test again with --pdb to figure out how to update it
+pytest -k test_thinking_prompt --pdb
+# Edit test
 ```
