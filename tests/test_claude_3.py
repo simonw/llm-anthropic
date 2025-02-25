@@ -41,7 +41,7 @@ def test_prompt():
 async def test_async_prompt():
     model = llm.get_async_model("claude-3-opus")
     model.key = model.key or ANTHROPIC_API_KEY  # don't override existing key
-    conversation = llm.AsyncConversation(model)
+    conversation = model.conversation()
     response = await conversation.prompt("Two names for a pet pelican, be brief")
     assert await response.text() == "1. Pelly\n2. Beaky"
     response_dict = dict(response.response_json)
