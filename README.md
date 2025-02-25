@@ -61,6 +61,27 @@ The plugin sets up `claude-3.5-sonnet` and similar as aliases, usable like this:
 ```bash
 llm -m claude-3.5-sonnet 'Fun facts about pelicans'
 ```
+## Extended reasoning with Claude 3.7 Sonnet
+
+Claude 3.7 introduced [extended thinking](https://www.anthropic.com/news/visible-extended-thinking) mode, where Claude can expend extra effort thinking through the prompt before producing a response.
+
+Use the `-o thinking 1` option to enable this feature:
+
+```bash
+llm -m claude-3.7-sonnet -o thinking 1 'Write a convincing speech to congress about the need to protect the California Brown Pelican'
+```
+The chain of thought is not currently visible while using LLM, but it is logged to the database and can be viewed using this command:
+```bash
+llm logs -c --json
+```
+Or in combination with `jq`:
+```bash
+llm logs --json -c | jq '.[0].response_json.content[0].thinking' -r
+```
+By default up to 1024 tokens can be used for thinking. You can increase this budget with the `thinking_budget` option:
+```bash
+llm -m claude-3.7-sonnet -o thinking_budget 32000 'Write a long speech about pelicans in French'
+```
 
 ## Model options
 
@@ -75,7 +96,7 @@ _type_lookup = {
     "object": "dict",
 }
 
-model = llm.get_model("claude-3.5-sonnet")
+model = llm.get_model("claude-3.7-sonnet")
 output = []
 for name, field in model.Options.schema()["properties"].items():
     any_of = field.get("anyOf")
@@ -126,6 +147,14 @@ cog.out("".join(output))
 - **stop_sequences**: `array, str`
 
     Custom text sequences that will cause the model to stop generating - pass either a list of strings or a single string
+
+- **thinking**: `boolean`
+
+    Enable thinking mode
+
+- **thinking_budget**: `int`
+
+    Number of tokens to budget for thinking
 
 <!-- [[[end]]] -->
 
