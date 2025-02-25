@@ -32,30 +32,32 @@ def register_models(register):
     # 3.5 models
     register(
         ClaudeMessages(
-            "claude-3-5-sonnet-20240620", supports_pdf=True, max_tokens=8192
+            "claude-3-5-sonnet-20240620", supports_pdf=True, default_max_tokens=8192
         ),
         AsyncClaudeMessages(
-            "claude-3-5-sonnet-20240620", supports_pdf=True, max_tokens=8192
+            "claude-3-5-sonnet-20240620", supports_pdf=True, default_max_tokens=8192
         ),
     )
     register(
         ClaudeMessages(
-            "claude-3-5-sonnet-20241022", supports_pdf=True, max_tokens=8192
+            "claude-3-5-sonnet-20241022", supports_pdf=True, default_max_tokens=8192
         ),
         AsyncClaudeMessages(
-            "claude-3-5-sonnet-20241022", supports_pdf=True, max_tokens=8192
+            "claude-3-5-sonnet-20241022", supports_pdf=True, default_max_tokens=8192
         ),
     )
     register(
-        ClaudeMessages("claude-3-5-sonnet-latest", supports_pdf=True, max_tokens=8192),
+        ClaudeMessages(
+            "claude-3-5-sonnet-latest", supports_pdf=True, default_max_tokens=8192
+        ),
         AsyncClaudeMessages(
-            "claude-3-5-sonnet-latest", supports_pdf=True, max_tokens=8192
+            "claude-3-5-sonnet-latest", supports_pdf=True, default_max_tokens=8192
         ),
         aliases=("claude-3.5-sonnet", "claude-3.5-sonnet-latest"),
     )
     register(
-        ClaudeMessages("claude-3-5-haiku-latest", max_tokens=8192),
-        AsyncClaudeMessages("claude-3-5-haiku-latest", max_tokens=8192),
+        ClaudeMessages("claude-3-5-haiku-latest", default_max_tokens=8192),
+        AsyncClaudeMessages("claude-3-5-haiku-latest", default_max_tokens=8192),
         aliases=("claude-3.5-haiku",),
     )
     # 3.7
@@ -63,24 +65,24 @@ def register_models(register):
         ClaudeMessagesThinking(
             "claude-3-7-sonnet-20250219",
             supports_pdf=True,
-            max_tokens=8192,
+            default_max_tokens=8192,
         ),
         AsyncClaudeMessagesThinking(
             "claude-3-7-sonnet-20250219",
             supports_pdf=True,
-            max_tokens=8192,
+            default_max_tokens=8192,
         ),
     )
     register(
         ClaudeMessagesThinking(
             "claude-3-7-sonnet-latest",
             supports_pdf=True,
-            max_tokens=8192,
+            default_max_tokens=8192,
         ),
         AsyncClaudeMessagesThinking(
             "claude-3-7-sonnet-latest",
             supports_pdf=True,
-            max_tokens=8192,
+            default_max_tokens=8192,
         ),
         aliases=("claude-3.7-sonnet", "claude-3.7-sonnet-latest"),
     )
@@ -194,7 +196,7 @@ class _Shared:
         claude_model_id=None,
         supports_images=True,
         supports_pdf=False,
-        max_tokens=None,
+        default_max_tokens=None,
     ):
         self.model_id = "anthropic/" + model_id
         self.claude_model_id = claude_model_id or model_id
@@ -210,8 +212,8 @@ class _Shared:
             )
         if supports_pdf:
             self.attachment_types.add("application/pdf")
-        if max_tokens is not None:
-            self.default_max_tokens = max_tokens
+        if default_max_tokens is not None:
+            self.default_max_tokens = default_max_tokens
 
     def prefill_text(self, prompt):
         if prompt.options.prefill and not prompt.options.hide_prefill:
