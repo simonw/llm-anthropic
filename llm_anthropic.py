@@ -271,9 +271,7 @@ class _Shared:
             prompt.options.thinking = True
         if self.supports_thinking and prompt.options.thinking:
             budget_tokens = prompt.options.thinking_budget or DEFAULT_THINKING_TOKENS
-            kwargs["extra_body"] = {
-                "thinking": {"type": "enabled", "budget_tokens": budget_tokens}
-            }
+            kwargs["thinking"] = {"type": "enabled", "budget_tokens": budget_tokens}
         if prompt.options.user_id:
             kwargs["metadata"] = {"user_id": prompt.options.user_id}
 
