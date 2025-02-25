@@ -318,7 +318,7 @@ class _Shared:
             and prompt.options.thinking_budget is not None
             and prompt.options.thinking_budget > max_tokens
         ):
-            max_tokens = prompt.options.thinking_budget
+            max_tokens = prompt.options.thinking_budget + 1
         kwargs["max_tokens"] = max_tokens
         if max_tokens > 64000:
             kwargs["betas"] = ["output-128k-2025-02-19"]
