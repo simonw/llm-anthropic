@@ -285,11 +285,6 @@ class _Shared:
         kwargs = {
             "model": self.claude_model_id,
             "messages": self.build_messages(prompt, conversation),
-            "max_tokens": (
-                prompt.options.max_tokens
-                if prompt.options.max_tokens is not None
-                else self.default_max_tokens
-            ),
         }
         if prompt.options.user_id:
             kwargs["metadata"] = {"user_id": prompt.options.user_id}
@@ -315,6 +310,21 @@ class _Shared:
             budget_tokens = prompt.options.thinking_budget or DEFAULT_THINKING_TOKENS
             kwargs["thinking"] = {"type": "enabled", "budget_tokens": budget_tokens}
 
+        max_tokens = self.default_max_tokens
+        if prompt.options.max_tokens is not None:
+            max_tokens = prompt.options.max_tokens
+        if (
+            self.supports_thinking
+            and prompt.options.thinking_budget is not None
+            and prompt.options.thinking_budget > max_tokens
+        ):
+            max_tokens = prompt.options.thinking_budget
+        kwargs["max_tokens"] = max_tokens
+        if max_tokens > 64000:
+            kwargs["betas"] = ["output-128k-2025-02-19"]
+            if "thinking" in kwargs:
+                kwargs["extra_body"] = {"thinking": kwargs.pop("thinking")}
+
         return kwargs
 
     def set_usage(self, response):
@@ -334,8 +344,12 @@ class ClaudeMessages(_Shared, llm.KeyModel):
         client = Anthropic(api_key=self.get_key(key))
         kwargs = self.build_kwargs(prompt, conversation)
         prefill_text = self.prefill_text(prompt)
+        if "betas" in kwargs:
+            messages_client = client.beta.messages
+        else:
+            messages_client = client.messages
         if stream:
-            with client.messages.stream(**kwargs) as stream:
+            with messages_client.stream(**kwargs) as stream:
                 if prefill_text:
                     yield prefill_text
                 for text in stream.text_stream:
@@ -343,7 +357,7 @@ class ClaudeMessages(_Shared, llm.KeyModel):
                 # This records usage and other data:
                 response.response_json = stream.get_final_message().model_dump()
         else:
-            completion = client.messages.create(**kwargs)
+            completion = messages_client.create(**kwargs)
             text = "".join(
                 [item.text for item in completion.content if hasattr(item, "text")]
             )
@@ -372,16 +386,20 @@ class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
     async def execute(self, prompt, stream, response, conversation, key):
         client = AsyncAnthropic(api_key=self.get_key(key))
         kwargs = self.build_kwargs(prompt, conversation)
+        if "betas" in kwargs:
+            messages_client = client.beta.messages
+        else:
+            messages_client = client.messages
         prefill_text = self.prefill_text(prompt)
         if stream:
-            async with client.messages.stream(**kwargs) as stream_obj:
+            async with messages_client.stream(**kwargs) as stream_obj:
                 if prefill_text:
                     yield prefill_text
                 async for text in stream_obj.text_stream:
                     yield text
             response.response_json = (await stream_obj.get_final_message()).model_dump()
         else:
-            completion = await client.messages.create(**kwargs)
+            completion = await messages_client.create(**kwargs)
             text = "".join(
                 [item.text for item in completion.content if hasattr(item, "text")]
             )
