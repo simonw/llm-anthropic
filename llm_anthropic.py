@@ -14,7 +14,7 @@ def register_models(register):
     register(
         ClaudeMessages("claude-3-opus-20240229"),
         AsyncClaudeMessages("claude-3-opus-20240229"),
-    ),
+    )
     register(
         ClaudeMessages("claude-3-opus-latest"),
         AsyncClaudeMessages("claude-3-opus-latest"),
@@ -63,26 +63,30 @@ def register_models(register):
     )
     # 3.7
     register(
-        ClaudeMessagesThinking(
+        ClaudeMessages(
             "claude-3-7-sonnet-20250219",
             supports_pdf=True,
+            supports_thinking=True,
             default_max_tokens=8192,
         ),
-        AsyncClaudeMessagesThinking(
+        AsyncClaudeMessages(
             "claude-3-7-sonnet-20250219",
             supports_pdf=True,
+            supports_thinking=True,
             default_max_tokens=8192,
         ),
     )
     register(
-        ClaudeMessagesThinking(
+        ClaudeMessages(
             "claude-3-7-sonnet-latest",
             supports_pdf=True,
+            supports_thinking=True,
             default_max_tokens=8192,
         ),
-        AsyncClaudeMessagesThinking(
+        AsyncClaudeMessages(
             "claude-3-7-sonnet-latest",
             supports_pdf=True,
+            supports_thinking=True,
             default_max_tokens=8192,
         ),
         aliases=("claude-3.7-sonnet", "claude-3.7-sonnet-latest"),
@@ -181,6 +185,16 @@ class ClaudeOptions(llm.Options):
         return self
 
 
+class ClaudeOptionsWithThinking(ClaudeOptions):
+    thinking: Optional[bool] = Field(
+        description="Enable thinking mode",
+        default=None,
+    )
+    thinking_budget: Optional[int] = Field(
+        description="Number of tokens to budget for thinking", default=None
+    )
+
+
 class _Shared:
     needs_key = "anthropic"
     key_env_var = "ANTHROPIC_API_KEY"
@@ -197,6 +211,7 @@ class _Shared:
         claude_model_id=None,
         supports_images=True,
         supports_pdf=False,
+        supports_thinking=False,
         default_max_tokens=None,
     ):
         self.model_id = "anthropic/" + model_id
@@ -213,6 +228,9 @@ class _Shared:
             )
         if supports_pdf:
             self.attachment_types.add("application/pdf")
+        if supports_thinking:
+            self.supports_thinking = True
+            self.Options = ClaudeOptionsWithThinking
         if default_max_tokens is not None:
             self.default_max_tokens = default_max_tokens
 
@@ -344,7 +362,6 @@ class _Shared:
 
 
 class ClaudeMessages(_Shared, llm.KeyModel):
-
     def execute(self, prompt, stream, response, conversation, key):
         client = Anthropic(api_key=self.get_key(key))
         kwargs = self.build_kwargs(prompt, conversation)
@@ -371,22 +388,6 @@ class ClaudeMessages(_Shared, llm.KeyModel):
         self.set_usage(response)
 
 
-class ClaudeOptionsWithThinking(ClaudeOptions):
-    thinking: Optional[bool] = Field(
-        description="Enable thinking mode",
-        default=None,
-    )
-    thinking_budget: Optional[int] = Field(
-        description="Number of tokens to budget for thinking", default=None
-    )
-
-
-class ClaudeMessagesThinking(ClaudeMessages):
-    supports_thinking = True
-
-    class Options(ClaudeOptionsWithThinking): ...
-
-
 class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
     async def execute(self, prompt, stream, response, conversation, key):
         client = AsyncAnthropic(api_key=self.get_key(key))
@@ -411,9 +412,3 @@ class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
             yield prefill_text + text
             response.response_json = completion.model_dump()
         self.set_usage(response)
-
-
-class AsyncClaudeMessagesThinking(AsyncClaudeMessages):
-    supports_thinking = True
-
-    class Options(ClaudeOptionsWithThinking): ...
