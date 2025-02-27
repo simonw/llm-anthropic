@@ -201,6 +201,7 @@ class _Shared:
     can_stream = True
 
     supports_thinking = False
+    supports_schema = True
     default_max_tokens = 4096
 
     class Options(ClaudeOptions): ...
@@ -348,6 +349,15 @@ class _Shared:
             if "thinking" in kwargs:
                 kwargs["extra_body"] = {"thinking": kwargs.pop("thinking")}
 
+        if prompt.schema:
+            kwargs["tools"] = [
+                {
+                    "name": "output_structured_data",
+                    "input_schema": prompt.schema,
+                }
+            ]
+            kwargs["tool_choice"] = {"type": "tool", "name": "output_structured_data"}
+
         return kwargs
 
     def set_usage(self, response):
@@ -374,8 +384,13 @@ class ClaudeMessages(_Shared, llm.KeyModel):
             with messages_client.stream(**kwargs) as stream:
                 if prefill_text:
                     yield prefill_text
-                for text in stream.text_stream:
-                    yield text
+                for chunk in stream:
+                    if hasattr(chunk, "delta"):
+                        delta = chunk.delta
+                        if hasattr(delta, "text"):
+                            yield delta.text
+                        elif hasattr(delta, "partial_json"):
+                            yield delta.partial_json
                 # This records usage and other data:
                 response.response_json = stream.get_final_message().model_dump()
         else:

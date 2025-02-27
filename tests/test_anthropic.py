@@ -1,6 +1,8 @@
+import json
 import llm
 import os
 import pytest
+from pydantic import BaseModel
 
 TINY_PNG = (
     b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\xa6\x00\x00\x01\x1a"
@@ -94,6 +96,25 @@ def test_image_prompt():
     assert response.input_tokens == 76
     assert response.output_tokens == 75
     assert response.token_details is None
+
+
+@pytest.mark.vcr
+def test_schema_prompt():
+    model = llm.get_model("claude-3.7-sonnet")
+    model.key = model.key or ANTHROPIC_API_KEY
+
+    class Dog(BaseModel):
+        name: str
+        age: int
+        bio: str
+
+    response = model.prompt("Invent a good dog", schema=Dog)
+    dog = json.loads(response.text())
+    assert dog == {
+        "name": "Buddy",
+        "age": 3,
+        "bio": "Buddy is a loyal and energetic Golden Retriever who loves long walks.",
+    }
 
 
 @pytest.mark.vcr
