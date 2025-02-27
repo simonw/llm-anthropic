@@ -98,6 +98,24 @@ def test_image_prompt():
     assert response.token_details is None
 
 
+@pytest.mark.vcr
+def test_image_with_no_prompt():
+    model = llm.get_model("claude-3.5-sonnet")
+    model.key = model.key or ANTHROPIC_API_KEY
+    response = model.prompt(
+        prompt=None,
+        attachments=[llm.Attachment(content=TINY_PNG)],
+    )
+    assert str(response) == (
+        "This image shows two simple rectangular blocks of solid colors stacked "
+        "vertically. The top rectangle is colored in a bright red, while the "
+        "bottom rectangle is colored in a vibrant lime green. They appear to "
+        "be of similar width but the green rectangle seems slightly taller "
+        "than the red one. The colors are very saturated and pure, creating "
+        "a strong visual contrast between the two blocks."
+    )
+
+
 class Dog(BaseModel):
     name: str
     age: int

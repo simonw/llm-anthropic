@@ -288,7 +288,8 @@ class _Shared:
                 }
                 for attachment in prompt.attachments
             ]
-            content.append({"type": "text", "text": prompt.prompt})
+            if prompt.prompt:
+                content.append({"type": "text", "text": prompt.prompt})
             messages.append(
                 {
                     "role": "user",
