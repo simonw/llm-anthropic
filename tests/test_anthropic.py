@@ -98,15 +98,16 @@ def test_image_prompt():
     assert response.token_details is None
 
 
+class Dog(BaseModel):
+    name: str
+    age: int
+    bio: str
+
+
 @pytest.mark.vcr
 def test_schema_prompt():
     model = llm.get_model("claude-3.7-sonnet")
     model.key = model.key or ANTHROPIC_API_KEY
-
-    class Dog(BaseModel):
-        name: str
-        age: int
-        bio: str
 
     response = model.prompt("Invent a good dog", schema=Dog)
     dog = json.loads(response.text())
@@ -114,6 +115,30 @@ def test_schema_prompt():
         "name": "Buddy",
         "age": 3,
         "bio": "Buddy is a loyal and energetic Golden Retriever who loves long walks.",
+    }
+
+
+@pytest.mark.vcr
+@pytest.mark.asyncio
+async def test_schema_prompt_async():
+    model = llm.get_async_model("claude-3.7-sonnet")
+    model.key = model.key or ANTHROPIC_API_KEY  # don't override existing key
+    response = await model.prompt("Invent a terrific dog", schema=Dog)
+    dog_json = await response.text()
+    dog = json.loads(dog_json)
+    assert dog == {
+        "name": "Maximus Thunder",
+        "age": 3,
+        "bio": (
+            "Maximus Thunder is an extraordinary golden retriever with a natural "
+            "talent for search and rescue operations. His keen sense of smell "
+            "can detect people trapped under debris from over a mile away. When "
+            "he's not saving lives, Maximus enjoys surfing at the beach and has "
+            "won three local dog surfing competitions. He's also incredibly "
+            "gentle with children and regularly visits hospitals as a therapy "
+            "dog. His favorite treat is peanut butter, and he has a unique howl "
+            'that sounds remarkably like he\'s saying "hello."'
+        ),
     }
 
 

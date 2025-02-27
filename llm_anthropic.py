@@ -416,8 +416,13 @@ class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
             async with messages_client.stream(**kwargs) as stream_obj:
                 if prefill_text:
                     yield prefill_text
-                async for text in stream_obj.text_stream:
-                    yield text
+                async for chunk in stream_obj:
+                    if hasattr(chunk, "delta"):
+                        delta = chunk.delta
+                        if hasattr(delta, "text"):
+                            yield delta.text
+                        elif hasattr(delta, "partial_json"):
+                            yield delta.partial_json
             response.response_json = (await stream_obj.get_final_message()).model_dump()
         else:
             completion = await messages_client.create(**kwargs)
