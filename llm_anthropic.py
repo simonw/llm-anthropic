@@ -195,6 +195,20 @@ class ClaudeOptionsWithThinking(ClaudeOptions):
     )
 
 
+def source_for_attachment(attachment):
+    if attachment.url:
+        return {
+            "type": "url",
+            "url": attachment.url,
+        }
+    else:
+        return {
+            "data": attachment.base64_content(),
+            "media_type": attachment.resolve_type(),
+            "type": "base64",
+        }
+
+
 class _Shared:
     needs_key = "anthropic"
     key_env_var = "ANTHROPIC_API_KEY"
@@ -245,21 +259,18 @@ class _Shared:
         if conversation:
             for response in conversation.responses:
                 if response.attachments:
-                    content = [
-                        {
-                            "type": (
-                                "document"
-                                if attachment.resolve_type() == "application/pdf"
-                                else "image"
-                            ),
-                            "source": {
-                                "data": attachment.base64_content(),
-                                "media_type": attachment.resolve_type(),
-                                "type": "base64",
-                            },
-                        }
-                        for attachment in response.attachments
-                    ]
+                    content = []
+                    for attachment in response.attachments:
+                        content.append(
+                            {
+                                "type": (
+                                    "document"
+                                    if attachment.resolve_type() == "application/pdf"
+                                    else "image"
+                                ),
+                                "source": source_for_attachment(attachment),
+                            }
+                        )
                     content.append({"type": "text", "text": response.prompt.prompt})
                 else:
                     content = response.prompt.prompt
@@ -280,11 +291,7 @@ class _Shared:
                         if attachment.resolve_type() == "application/pdf"
                         else "image"
                     ),
-                    "source": {
-                        "data": attachment.base64_content(),
-                        "media_type": attachment.resolve_type(),
-                        "type": "base64",
-                    },
+                    "source": source_for_attachment(attachment),
                 }
                 for attachment in prompt.attachments
             ]

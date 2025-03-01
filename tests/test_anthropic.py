@@ -116,6 +116,31 @@ def test_image_with_no_prompt():
     )
 
 
+@pytest.mark.vcr
+def test_url_prompt():
+    model = llm.get_model("claude-3.5-sonnet")
+    model.key = model.key or ANTHROPIC_API_KEY
+    response = model.prompt(
+        prompt="describe image",
+        attachments=[
+            llm.Attachment(
+                url="https://static.simonwillison.net/static/2024/pelican.jpg"
+            )
+        ],
+    )
+    assert str(response) == (
+        "This image shows a Brown Pelican perched on rocky ground near what appears "
+        "to be a marina or harbor, with boats visible in the background. The pelican "
+        "is captured in a profile view, showing off its distinctive long beak and "
+        "throat pouch. The bird's feathers appear to be a grayish-brown color, and "
+        "there's a nice rim lighting effect around its head and neck created by what "
+        "seems to be backlighting from the sun. The pelican's posture is upright and "
+        "alert, which is typical for these coastal birds. The setting suggests this "
+        "is likely taken at a coastal location where pelicans commonly gather to rest "
+        "and fish."
+    )
+
+
 class Dog(BaseModel):
     name: str
     age: int
