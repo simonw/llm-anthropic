@@ -44,23 +44,34 @@ Run `llm models` to list the models, and `llm models --options` to include a lis
 
 Run prompts like this:
 ```bash
+llm -m claude-3.7-sonnet 'Fun facts about pelicans'
 llm -m claude-3.5-sonnet 'Fun facts about pelicans'
 llm -m claude-3.5-haiku 'Fun facts about armadillos'
 llm -m claude-3-opus 'Fun facts about squirrels'
 ```
-Images are supported too, for models other than Claude 3.5 Haiku:
+Image attachments are supported too:
 ```bash
 llm -m claude-3.5-sonnet 'describe this image' -a https://static.simonwillison.net/static/2024/pelicans.jpg
 llm -m claude-3-haiku 'extract text' -a page.png
 ```
-Claude 3.5 Sonnet can handle PDF files:
+The Claude 3.5 and 3.7 models can handle PDF files:
 ```bash
 llm -m claude-3.5-sonnet 'extract text' -a page.pdf
 ```
-The plugin sets up `claude-3.5-sonnet` and similar as aliases, usable like this:
+Anthropic's models support [schemas](https://llm.datasette.io/en/stable/schemas.html). Here's how to use Claude 3.7 Sonnet to invent a dog:
+
 ```bash
-llm -m claude-3.5-sonnet 'Fun facts about pelicans'
+llm -m claude-3.7-sonnet --schema 'name,age int,bio: one sentence' 'invent a surprising dog'
 ```
+Example output:
+```json
+{
+  "name": "Whiskers the Mathematical Mastiff",
+  "age": 7,
+  "bio": "Whiskers is a mastiff who can solve complex calculus problems by barking in binary code and has won three international mathematics competitions against human competitors."
+}
+```
+
 ## Extended reasoning with Claude 3.7 Sonnet
 
 Claude 3.7 introduced [extended thinking](https://www.anthropic.com/news/visible-extended-thinking) mode, where Claude can expend extra effort thinking through the prompt before producing a response.
