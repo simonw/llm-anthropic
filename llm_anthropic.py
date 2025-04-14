@@ -136,6 +136,10 @@ class ClaudeOptions(llm.Options):
         ),
         default=None,
     )
+    cache: Optional[bool] = Field(
+        description="Use Anthropic prompt cache for any attachments or fragments",
+        default=None,
+    )
 
     @field_validator("stop_sequences")
     def validate_stop_sequences(cls, stop_sequences):
@@ -283,6 +287,7 @@ class _Shared:
                         {"role": "assistant", "content": response.text_or_raise()},
                     ]
                 )
+
         if prompt.attachments:
             content = [
                 {
@@ -295,16 +300,16 @@ class _Shared:
                 }
                 for attachment in prompt.attachments
             ]
+            if prompt.options.cache and content:
+                content[-1]["cache_control"] = {"type": "ephemeral"}
             if prompt.prompt:
                 content.append({"type": "text", "text": prompt.prompt})
-            messages.append(
-                {
-                    "role": "user",
-                    "content": content,
-                }
-            )
+            message = {"role": "user", "content": content}
         else:
-            messages.append({"role": "user", "content": prompt.prompt})
+            if prompt.prompt and messages:
+                message[-1]["content"]["cache_control"] = {"type": "ephemeral"}
+            message = {"role": "user", "content": prompt.prompt}
+        messages.append(message)
         if prompt.options.prefill:
             messages.append({"role": "assistant", "content": prompt.options.prefill})
         return messages
@@ -370,10 +375,11 @@ class _Shared:
 
     def set_usage(self, response):
         usage = response.response_json.pop("usage")
-        if usage:
-            response.set_usage(
-                input=usage.get("input_tokens"), output=usage.get("output_tokens")
-            )
+        input_tokens = usage.pop("input_tokens")
+        output_tokens = usage.pop("output_tokens")
+        response.set_usage(
+            input=input_tokens, output=output_tokens, details=usage or None
+        )
 
     def __str__(self):
         return "Anthropic Messages: {}".format(self.model_id)
