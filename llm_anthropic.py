@@ -306,8 +306,12 @@ class _Shared:
                 content.append({"type": "text", "text": prompt.prompt})
             message = {"role": "user", "content": content}
         else:
-            if prompt.prompt and messages:
-                message[-1]["content"]["cache_control"] = {"type": "ephemeral"}
+            if prompt.options.cache and messages:
+                last_message = messages[-1]
+                if isinstance(last_message.get("content"), dict):
+                    last_message["content"]["cache_control"] = {"type": "ephemeral"}
+                else:
+                    last_message["cache_control"] = {"type": "ephemeral"}
             message = {"role": "user", "content": prompt.prompt}
         messages.append(message)
         if prompt.options.prefill:
@@ -377,9 +381,11 @@ class _Shared:
         usage = response.response_json.pop("usage")
         input_tokens = usage.pop("input_tokens")
         output_tokens = usage.pop("output_tokens")
-        response.set_usage(
-            input=input_tokens, output=output_tokens, details=usage or None
-        )
+        # Only include usage details if prompt caching was on
+        details = None
+        if response.prompt.options.cache:
+            details = usage
+        response.set_usage(input=input_tokens, output=output_tokens, details=details)
 
     def __str__(self):
         return "Anthropic Messages: {}".format(self.model_id)
