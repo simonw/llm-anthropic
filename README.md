@@ -159,6 +159,10 @@ cog.out("".join(output))
 
     Custom text sequences that will cause the model to stop generating - pass either a list of strings or a single string
 
+- **cache**: `boolean`
+
+    Use Anthropic prompt cache for any attachments or fragments
+
 - **thinking**: `boolean`
 
     Enable thinking mode
