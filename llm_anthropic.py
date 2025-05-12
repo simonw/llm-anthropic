@@ -280,8 +280,7 @@ class _Shared:
                 else:
                     content = response.prompt.prompt
                 assistant_content = response.text_or_raise()
-                # TODO: Make this .tools_calls_or_raise() once that's available:
-                tool_calls = response.tool_calls()
+                tool_calls = response.tools_calls_or_raise()
                 if tool_calls:
                     assistant_content = [
                         {
