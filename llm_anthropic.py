@@ -220,6 +220,7 @@ class _Shared:
 
     supports_thinking = False
     supports_schema = True
+    supports_tools = True
     default_max_tokens = 4096
 
     class Options(ClaudeOptions): ...
@@ -278,15 +279,49 @@ class _Shared:
                     content.append({"type": "text", "text": response.prompt.prompt})
                 else:
                     content = response.prompt.prompt
+                assistant_content = response.text_or_raise()
+                # TODO: Make this .tools_calls_or_raise() once that's available:
+                tool_calls = response.tool_calls()
+                if tool_calls:
+                    assistant_content = [
+                        {
+                            "type": "text",
+                            "text": assistant_content,
+                        }
+                    ]
+                    for tool_call in tool_calls:
+                        assistant_content.append(
+                            {
+                                "type": "tool_use",
+                                "id": tool_call.tool_call_id,
+                                "name": tool_call.name,
+                                "input": tool_call.arguments,
+                            }
+                        )
                 messages.extend(
                     [
                         {
                             "role": "user",
                             "content": content,
                         },
-                        {"role": "assistant", "content": response.text_or_raise()},
+                        {"role": "assistant", "content": assistant_content},
                     ]
                 )
+
+        if prompt.tool_results:
+            messages.append(
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": tool_result.tool_call_id,
+                            "content": tool_result.output,
+                        }
+                        for tool_result in prompt.tool_results
+                    ],
+                }
+            )
 
         if prompt.attachments:
             content = [
@@ -366,14 +401,30 @@ class _Shared:
             if "thinking" in kwargs:
                 kwargs["extra_body"] = {"thinking": kwargs.pop("thinking")}
 
+        tools = []
         if prompt.schema:
-            kwargs["tools"] = [
+            tools.append(
                 {
                     "name": "output_structured_data",
                     "input_schema": prompt.schema,
                 }
-            ]
+            )
             kwargs["tool_choice"] = {"type": "tool", "name": "output_structured_data"}
+
+        if prompt.tools:
+            tools.extend(
+                [
+                    {
+                        "name": tool.name,
+                        "description": tool.description,
+                        "input_schema": tool.input_schema,
+                    }
+                    for tool in prompt.tools
+                ]
+            )
+
+        if tools:
+            kwargs["tools"] = tools
 
         return kwargs
 
@@ -386,6 +437,19 @@ class _Shared:
         if response.prompt.options.cache:
             details = usage
         response.set_usage(input=input_tokens, output=output_tokens, details=details)
+
+    def add_tool_usage(self, response, last_message):
+        tool_uses = [
+            item for item in last_message["content"] if item["type"] == "tool_use"
+        ]
+        for tool_use in tool_uses:
+            response.add_tool_call(
+                llm.ToolCall(
+                    tool_call_id=tool_use["id"],
+                    name=tool_use["name"],
+                    arguments=tool_use["input"],
+                )
+            )
 
     def __str__(self):
         return "Anthropic Messages: {}".format(self.model_id)
@@ -412,7 +476,9 @@ class ClaudeMessages(_Shared, llm.KeyModel):
                         elif hasattr(delta, "partial_json"):
                             yield delta.partial_json
                 # This records usage and other data:
-                response.response_json = stream.get_final_message().model_dump()
+                last_message = stream.get_final_message().model_dump()
+                response.response_json = last_message
+                self.add_tool_usage(response, last_message)
         else:
             completion = messages_client.create(**kwargs)
             text = "".join(
@@ -420,6 +486,8 @@ class ClaudeMessages(_Shared, llm.KeyModel):
             )
             yield prefill_text + text
             response.response_json = completion.model_dump()
+            # TODO: Confirm that this works:
+            self.add_tool_usage(response, response.response_json)
         self.set_usage(response)
 
 
@@ -444,6 +512,8 @@ class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
                         elif hasattr(delta, "partial_json"):
                             yield delta.partial_json
             response.response_json = (await stream_obj.get_final_message()).model_dump()
+            # TODO: Test this:
+            self.add_tool_usage(response, response.response_json)
         else:
             completion = await messages_client.create(**kwargs)
             text = "".join(
@@ -451,4 +521,6 @@ class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
             )
             yield prefill_text + text
             response.response_json = completion.model_dump()
+            # TODO: Test this:
+            self.add_tool_usage(response, response.response_json)
         self.set_usage(response)
