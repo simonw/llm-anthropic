@@ -474,7 +474,7 @@ class _Shared:
             details = usage
         response.set_usage(input=input_tokens, output=output_tokens, details=details)
 
-    def add_tool_usage(self, response, last_message):
+    def add_tool_usage(self, response, last_message) -> bool:
         tool_uses = [
             item for item in last_message["content"] if item["type"] == "tool_use"
         ]
@@ -486,6 +486,7 @@ class _Shared:
                     arguments=tool_use["input"],
                 )
             )
+        return bool(tool_uses)
 
     def __str__(self):
         return "Anthropic Messages: {}".format(self.model_id)
@@ -516,7 +517,9 @@ class ClaudeMessages(_Shared, llm.KeyModel):
                 # This records usage and other data:
                 last_message = stream.get_final_message().model_dump()
                 response.response_json = last_message
-                self.add_tool_usage(response, last_message)
+                if self.add_tool_usage(response, last_message):
+                    # Avoid "can have dragons.Now that I " bug
+                    yield ' '
         else:
             completion = messages_client.create(**kwargs)
             text = "".join(
@@ -524,8 +527,8 @@ class ClaudeMessages(_Shared, llm.KeyModel):
             )
             yield prefill_text + text
             response.response_json = completion.model_dump()
-            # TODO: Confirm that this works:
-            self.add_tool_usage(response, response.response_json)
+            if self.add_tool_usage(response, response.response_json):
+                yield ' '
         self.set_usage(response)
 
 
@@ -547,7 +550,7 @@ class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
                         delta = chunk.delta
                         if hasattr(delta, "text"):
                             yield delta.text
-                        elif hasattr(delta, "partial_json"):
+                        elif hasattr(delta, "partial_json") and prompt.schema:
                             yield delta.partial_json
             response.response_json = (await stream_obj.get_final_message()).model_dump()
             # TODO: Test this:
