@@ -261,98 +261,135 @@ class _Shared:
 
     def build_messages(self, prompt, conversation) -> List[dict]:
         messages = []
+
+        # Process existing conversation history
         if conversation:
             for response in conversation.responses:
+                # Build user message
+                user_content = []
+
+                # Handle attachments in user message
                 if response.attachments:
-                    content = []
                     for attachment in response.attachments:
-                        content.append(
+                        attachment_type = (
+                            "document"
+                            if attachment.resolve_type() == "application/pdf"
+                            else "image"
+                        )
+                        user_content.append(
                             {
-                                "type": (
-                                    "document"
-                                    if attachment.resolve_type() == "application/pdf"
-                                    else "image"
-                                ),
+                                "type": attachment_type,
                                 "source": source_for_attachment(attachment),
                             }
                         )
-                    content.append({"type": "text", "text": response.prompt.prompt})
-                else:
-                    content = response.prompt.prompt
-                assistant_content = response.text_or_raise()
-                tool_calls = response.tools_calls_or_raise()
-                if tool_calls:
-                    assistant_content = [
-                        {
-                            "type": "text",
-                            "text": assistant_content,
-                        }
-                    ]
-                    for tool_call in tool_calls:
-                        assistant_content.append(
+
+                # Add text content if it exists
+                if response.prompt.prompt:
+                    user_content.append(
+                        {"type": "text", "text": response.prompt.prompt}
+                    )
+
+                # Handle tool results if present (add to the same user message)
+                if response.prompt.tool_results:
+                    for tool_result in response.prompt.tool_results:
+                        user_content.append(
                             {
-                                "type": "tool_use",
-                                "id": tool_call.tool_call_id,
-                                "name": tool_call.name,
-                                "input": tool_call.arguments,
+                                "type": "tool_result",
+                                "tool_use_id": tool_result.tool_call_id,
+                                "content": tool_result.output,
                             }
                         )
-                messages.extend(
-                    [
+
+                # Only add the message if we have content
+                if user_content:
+                    messages.append({"role": "user", "content": user_content})
+
+                # Build assistant message
+                assistant_content = []
+                text_content = response.text_or_raise()
+
+                # Add text content if it exists
+                if text_content:
+                    assistant_content.append({"type": "text", "text": text_content})
+
+                # Add tool calls if they exist
+                tool_calls = response.tool_calls_or_raise()
+                for tool_call in tool_calls:
+                    assistant_content.append(
                         {
-                            "role": "user",
-                            "content": content,
-                        },
-                        {"role": "assistant", "content": assistant_content},
-                    ]
+                            "type": "tool_use",
+                            "id": tool_call.tool_call_id,
+                            "name": tool_call.name,
+                            "input": tool_call.arguments,
+                        }
+                    )
+
+                # Add assistant message if we have content
+                if assistant_content:
+                    messages.append({"role": "assistant", "content": assistant_content})
+
+        # Handle current prompt's tool results and user content together
+        user_content = []
+
+        # Add attachments
+        if prompt.attachments:
+            for attachment in prompt.attachments:
+                attachment_type = (
+                    "document"
+                    if attachment.resolve_type() == "application/pdf"
+                    else "image"
+                )
+                user_content.append(
+                    {
+                        "type": attachment_type,
+                        "source": source_for_attachment(attachment),
+                    }
                 )
 
-        if prompt.tool_results:
-            messages.append(
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "tool_result",
-                            "tool_use_id": tool_result.tool_call_id,
-                            "content": tool_result.output,
-                        }
-                        for tool_result in prompt.tool_results
-                    ],
-                }
-            )
+            # Add cache control if needed
+            if prompt.options.cache and user_content:
+                user_content[-1]["cache_control"] = {"type": "ephemeral"}
 
-        if prompt.attachments:
-            content = [
-                {
-                    "type": (
-                        "document"
-                        if attachment.resolve_type() == "application/pdf"
-                        else "image"
-                    ),
-                    "source": source_for_attachment(attachment),
-                }
-                for attachment in prompt.attachments
-            ]
-            if prompt.options.cache and content:
-                content[-1]["cache_control"] = {"type": "ephemeral"}
-            if prompt.prompt:
-                content.append({"type": "text", "text": prompt.prompt})
-            message = {"role": "user", "content": content}
-        else:
-            if prompt.options.cache and messages:
-                last_message = messages[-1]
-                if isinstance(last_message.get("content"), dict):
-                    last_message["content"]["cache_control"] = {"type": "ephemeral"}
-                else:
-                    last_message["cache_control"] = {"type": "ephemeral"}
-            message = {"role": "user", "content": prompt.prompt}
-        messages.append(message)
+        # Add current prompt's tool results
+        if prompt.tool_results:
+            for tool_result in prompt.tool_results:
+                user_content.append(
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": tool_result.tool_call_id,
+                        "content": tool_result.output,
+                    }
+                )
+
+        # Add text content if it exists
+        if prompt.prompt:
+            user_content.append({"type": "text", "text": prompt.prompt})
+
+        # Add the user message if we have content
+        if user_content:
+            messages.append({"role": "user", "content": user_content})
+
+        # Handle cache control for messages without attachments
+        elif prompt.options.cache and messages:
+            last_message = messages[-1]
+            if isinstance(last_message.get("content"), list):
+                last_message["content"][-1]["cache_control"] = {"type": "ephemeral"}
+            else:
+                # This should not happen with our new structure, but keeping as a fallback
+                last_message["cache_control"] = {"type": "ephemeral"}
+
+        # Add prefill if specified
         if prompt.options.prefill:
-            messages.append({"role": "assistant", "content": prompt.options.prefill})
+            prefill_content = [{"type": "text", "text": prompt.options.prefill}]
+            messages.append({"role": "assistant", "content": prefill_content})
+
         return messages
 
     def build_kwargs(self, prompt, conversation):
+        if prompt.schema and prompt.tools:
+            raise ValueError(
+                "llm-anthropic does not yet support using both schema and tools in the same prompt"
+            )
         kwargs = {
             "model": self.claude_model_id,
             "messages": self.build_messages(prompt, conversation),
@@ -415,7 +452,7 @@ class _Shared:
                 [
                     {
                         "name": tool.name,
-                        "description": tool.description,
+                        "description": tool.description or "",
                         "input_schema": tool.input_schema,
                     }
                     for tool in prompt.tools
@@ -471,8 +508,10 @@ class ClaudeMessages(_Shared, llm.KeyModel):
                     if hasattr(chunk, "delta"):
                         delta = chunk.delta
                         if hasattr(delta, "text"):
+                            if delta.text.startswith("{"):
+                                breakpoint()
                             yield delta.text
-                        elif hasattr(delta, "partial_json"):
+                        elif hasattr(delta, "partial_json") and prompt.schema:
                             yield delta.partial_json
                 # This records usage and other data:
                 last_message = stream.get_final_message().model_dump()
