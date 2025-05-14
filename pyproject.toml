@@ -9,7 +9,7 @@ classifiers = [
     "License :: OSI Approved :: Apache Software License"
 ]
 dependencies = [
-    "llm>=0.24",
+    "llm>=0.26a0",
     "anthropic>=0.48.0",
 ]
 

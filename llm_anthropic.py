@@ -519,7 +519,7 @@ class ClaudeMessages(_Shared, llm.KeyModel):
                 response.response_json = last_message
                 if self.add_tool_usage(response, last_message):
                     # Avoid "can have dragons.Now that I " bug
-                    yield ' '
+                    yield " "
         else:
             completion = messages_client.create(**kwargs)
             text = "".join(
@@ -528,7 +528,7 @@ class ClaudeMessages(_Shared, llm.KeyModel):
             yield prefill_text + text
             response.response_json = completion.model_dump()
             if self.add_tool_usage(response, response.response_json):
-                yield ' '
+                yield " "
         self.set_usage(response)
 
 
