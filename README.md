@@ -244,7 +244,7 @@ I use the following sequence:
 # First delete the relevant cassette if it exists already:
 rm tests/cassettes/test_anthropic/test_thinking_prompt.yaml
 # Run this failing test to recreate the cassette
-PYTEST_ANTHROPIC_API_KEY="$(llm keys get claude)" pytest -k test_thinking_prompt  --record-mode once
+PYTEST_ANTHROPIC_API_KEY="$(llm keys get claude)" pytest -k test_thinking_prompt --record-mode once
 # Now run the test again with --pdb to figure out how to update it
 pytest -k test_thinking_prompt --pdb
 # Edit test
