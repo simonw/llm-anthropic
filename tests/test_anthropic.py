@@ -150,9 +150,8 @@ class Dog(BaseModel):
 @pytest.mark.vcr
 def test_schema_prompt():
     model = llm.get_model("claude-3.7-sonnet")
-    model.key = model.key or ANTHROPIC_API_KEY
 
-    response = model.prompt("Invent a good dog", schema=Dog)
+    response = model.prompt("Invent a good dog", schema=Dog, key=ANTHROPIC_API_KEY)
     dog = json.loads(response.text())
     assert dog == {
         "name": "Buddy",
@@ -165,8 +164,9 @@ def test_schema_prompt():
 @pytest.mark.asyncio
 async def test_schema_prompt_async():
     model = llm.get_async_model("claude-3.7-sonnet")
-    model.key = model.key or ANTHROPIC_API_KEY  # don't override existing key
-    response = await model.prompt("Invent a terrific dog", schema=Dog)
+    response = await model.prompt(
+        "Invent a terrific dog", schema=Dog, key=ANTHROPIC_API_KEY
+    )
     dog_json = await response.text()
     dog = json.loads(dog_json)
     assert dog == {
@@ -188,12 +188,12 @@ async def test_schema_prompt_async():
 @pytest.mark.vcr
 def test_prompt_with_prefill_and_stop_sequences():
     model = llm.get_model("claude-3.5-haiku")
-    model.key = model.key or ANTHROPIC_API_KEY
     response = model.prompt(
         "Very short function describing a pelican",
         prefill="```python",
         stop_sequences=["```"],
         hide_prefill=True,
+        key=ANTHROPIC_API_KEY,
     )
     text = response.text()
     assert text.startswith(
@@ -217,10 +217,9 @@ def test_prompt_with_prefill_and_stop_sequences():
 @pytest.mark.vcr
 def test_thinking_prompt():
     model = llm.get_model("claude-3.7-sonnet")
-    model.key = model.key or ANTHROPIC_API_KEY
     conversation = model.conversation()
     response = conversation.prompt(
-        "Two names for a pet pelican, be brief", thinking=True
+        "Two names for a pet pelican, be brief", thinking=True, key=ANTHROPIC_API_KEY
     )
     assert response.text() == "Scoop and Beaky"
     response_dict = dict(response.response_json)
@@ -244,3 +243,31 @@ def test_thinking_prompt():
     assert response.input_tokens == 45
     assert response.output_tokens == 94
     assert response.token_details is None
+
+
+@pytest.mark.vcr
+def test_tools():
+    model = llm.get_model("claude-3.5-haiku")
+    names = ["Charles", "Sammy"]
+    chain_response = model.chain(
+        "Two names for a pet pelican",
+        tools=[
+            llm.Tool.function(lambda: names.pop(0), name="pelican_name_generator"),
+        ],
+        key=ANTHROPIC_API_KEY,
+    )
+    text = chain_response.text()
+    assert text == (
+        "I'll help you generate two names for a pet pelican using the pelican name generator tool. "
+        "Here are two fun names for your pet pelican:\n"
+        "1. Charles - A distinguished, classic name that gives your pelican a bit of sophistication.\n"
+        "2. Sammy - A friendly, playful name that suggests a cheerful and approachable personality.\n\n"
+        "Would you like me to generate more names or do you like these? Each pelican name can have "
+        "its own unique charm, so feel free to ask for more suggestions!"
+    )
+    tool_calls = chain_response._responses[0].tool_calls()
+    assert len(tool_calls) == 2
+    assert all(call.name == "pelican_name_generator" for call in tool_calls)
+    assert [
+        result.output for result in chain_response._responses[1].prompt.tool_results
+    ] == ["Charles", "Sammy"]
