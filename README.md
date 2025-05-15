@@ -215,9 +215,7 @@ response = llm.query(
 
 The `extra-anthropic-models.yaml` file allows you to define custom Anthropic Claude models to be loaded by LLM. This is useful for experimenting with beta models, testing upcoming models before they're officially supported, or configuring access to specialized models.
 
-## File Location
-
-Place this file in your LLM user directory. Find that by running:
+Place the `extra-anthropic-models.yaml` file in your LLM user directory. Find that by running:
 ```bash
 llm logs path
 ```
