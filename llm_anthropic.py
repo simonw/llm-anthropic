@@ -3,6 +3,7 @@ import llm
 import json
 from pydantic import Field, field_validator, model_validator
 from typing import Optional, List, Union
+import yaml
 
 DEFAULT_THINKING_TOKENS = 1024
 DEFAULT_TEMPERATURE = 1.0
@@ -91,6 +92,27 @@ def register_models(register):
         ),
         aliases=("claude-3.7-sonnet", "claude-3.7-sonnet-latest"),
     )
+    # extra-anthropic-models.yaml
+    path = llm.user_dir() / "extra-anthropic-models.yaml"
+    if path.exists():
+        # It's YAML, load it
+        with path.open("r") as f:
+            extra_models = yaml.safe_load(f)
+        for model in extra_models:
+            register(
+                ClaudeMessages(
+                    model["model_id"],
+                    supports_pdf=model.get("supports_pdf", False),
+                    supports_thinking=model.get("supports_thinking", False),
+                    default_max_tokens=model.get("default_max_tokens", 8192),
+                ),
+                AsyncClaudeMessages(
+                    model["model_id"],
+                    supports_pdf=model.get("supports_pdf", False),
+                    supports_thinking=model.get("supports_thinking", False),
+                    default_max_tokens=model.get("default_max_tokens", 8192),
+                ),
+            )
 
 
 class ClaudeOptions(llm.Options):

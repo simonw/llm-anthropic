@@ -211,6 +211,45 @@ response = llm.query(
 )
 ```
 
+## Registering extra Anthropic models
+
+The `extra-anthropic-models.yaml` file allows you to define custom Anthropic Claude models to be loaded by LLM. This is useful for experimenting with beta models, testing upcoming models before they're officially supported, or configuring access to specialized models.
+
+## File Location
+
+Place this file in your LLM user directory. Find that by running:
+```bash
+llm logs path
+```
+On macOS this is typically `~/Library/Application Support/io.datasette.llm/`.
+
+### Format
+
+The file should contain a list of model definitions in YAML format, where each model has the following structure:
+
+```yaml
+- model_id: "claude-3-x-example-20240101"  # Required: The Anthropic model ID
+  supports_pdf: true                       # Optional: Whether the model supports PDF attachments (default: false)
+  supports_thinking: true                  # Optional: Whether the model supports the thinking feature (default: false)
+  default_max_tokens: 16384                # Optional: Maximum tokens for generation (default: 8192)
+```
+
+### Example
+
+Here's an example configuration that defines two custom models:
+
+```yaml
+- model_id: "claude-3-experimental-20240530"
+  supports_pdf: true
+  supports_thinking: true
+  default_max_tokens: 16384
+
+- model_id: "claude-3-8-special-20250301"
+  supports_pdf: true
+  supports_thinking: true
+  default_max_tokens: 32768
+```
+
 ## Development
 
 To set up this plugin locally, first checkout the code. Then create a new virtual environment:
