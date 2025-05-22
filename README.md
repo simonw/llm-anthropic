@@ -44,17 +44,16 @@ Run `llm models` to list the models, and `llm models --options` to include a lis
 
 Run prompts like this:
 ```bash
-llm -m claude-3.7-sonnet 'Fun facts about pelicans'
-llm -m claude-3.5-sonnet 'Fun facts about pelicans'
+llm -m claude-4-opus 'Fun facts about walruses'
+llm -m claude-4-sonnet 'Fun facts about pelicans'
 llm -m claude-3.5-haiku 'Fun facts about armadillos'
-llm -m claude-3-opus 'Fun facts about squirrels'
 ```
 Image attachments are supported too:
 ```bash
 llm -m claude-3.5-sonnet 'describe this image' -a https://static.simonwillison.net/static/2024/pelicans.jpg
 llm -m claude-3-haiku 'extract text' -a page.png
 ```
-The Claude 3.5 and 3.7 models can handle PDF files:
+The Claude 3.5 and 3.7 and 4 models can handle PDF files:
 ```bash
 llm -m claude-3.5-sonnet 'extract text' -a page.pdf
 ```
