@@ -539,8 +539,6 @@ class ClaudeMessages(_Shared, llm.KeyModel):
                     if hasattr(chunk, "delta"):
                         delta = chunk.delta
                         if hasattr(delta, "text"):
-                            if delta.text.startswith("{"):
-                                breakpoint()
                             yield delta.text
                         elif hasattr(delta, "partial_json") and prompt.schema:
                             yield delta.partial_json
