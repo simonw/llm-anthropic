@@ -108,21 +108,21 @@ This plugin supports Anthropic's prompt caching feature, which can significantly
 
 **Enable 5-minute caching for user prompt only:**
 ```bash
-llm -m claude-3.5-sonnet -o cache_prompt=5 \
+llm -m claude-3.5-sonnet -o cache_prompt 5 \
   "Generate Python code for data analysis"
 ```
 
 **Enable 1-hour caching for both user and system prompts:**
 ```bash
 llm -m claude-3.5-sonnet -s "You are an expert data analyst" \
-  -o cache_prompt=60 -o cache_system=60 \
+  -o cache_prompt 60 -o cache_system 60 \
   "Explain PCA in detail"
 ```
 
 **Cache user prompt with 5-minute duration, system prompt with 1-hour duration:**
 ```bash
 llm -m claude-3.5-sonnet -s "You are an expert data analyst" \
-  -o cache_prompt=5 -o cache_system=60 \
+  -o cache_prompt 5 -o cache_system 60 \
   "Generate some advanced SQL queries"
 ```
 
@@ -147,14 +147,6 @@ response = query(
     cache_prompt=5,  # No need to specify cache_system for system-only prompts
 )
 ```
-
-**Breaking Change:** In version 0.16a2+, the `cache_prompt` and `cache_system` options now accept integer values (5, 60, or None) instead of boolean values. To migrate:
-- `cache_prompt=True` → `cache_prompt=60`
-- `cache_prompt=False` → `cache_prompt=None` (or omit the parameter)
-- `cache_system=True` → `cache_system=60`
-- `cache_system=False` → `cache_system=None` (or omit the parameter)
-
-The 1-hour cache is made possible through extended TTL support, enabled by the `extended-cache-ttl-2025-04-11` anthropic-beta flag.
 
 ## Model options
 
@@ -314,22 +306,4 @@ PYTEST_ANTHROPIC_API_KEY="$(llm keys get claude)" pytest -k test_thinking_prompt
 # Now run the test again with --pdb to figure out how to update it
 pytest -k test_thinking_prompt --pdb
 # Edit test
-```
-
-## Prompt Caching
-
-This plugin supports Anthropic's prompt caching feature, which can significantly reduce costs and improve response times for repeated or similar prompts. You can enable caching for both user prompts and system prompts with configurable durations.
-
-### Cache Duration Options
-
-- `5` - 5-minute cache (shorter duration, good for development and testing)
-- `60` - 1-hour cache (longer duration, cost-effective for production use)
-- `None` - No caching (default)
-
-### CLI Examples
-
-**Enable 5-minute caching for user prompt only:**
-```bash
-llm -m claude-3.5-sonnet -o cache_prompt=5 \
-  "Generate Python code for data analysis"
 ```
