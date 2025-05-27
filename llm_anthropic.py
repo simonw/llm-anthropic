@@ -166,8 +166,13 @@ class ClaudeOptions(llm.Options):
         ),
         default=None,
     )
-    cache: Optional[bool] = Field(
-        description="Use Anthropic prompt cache for any attachments or fragments",
+    cache_prompt: Optional[int] = Field(
+        description="Cache duration for user prompt in minutes. Use 5 for 5-minute cache, 60 for 1-hour cache, or None to disable caching",
+        default=None,
+    )
+
+    cache_system: Optional[int] = Field(
+        description="Cache duration for system prompt in minutes. Use 5 for 5-minute cache, 60 for 1-hour cache, or None to disable caching",
         default=None,
     )
 
@@ -211,6 +216,20 @@ class ClaudeOptions(llm.Options):
         if top_k is not None and top_k <= 0:
             raise ValueError("top_k must be a positive integer")
         return top_k
+
+    @field_validator("cache_prompt")
+    @classmethod
+    def validate_cache_prompt(cls, cache_minutes):
+        if cache_minutes is not None and cache_minutes not in [5, 60]:
+            raise ValueError("cache_prompt must be 5 (minutes), 60 (minutes), or None")
+        return cache_minutes
+
+    @field_validator("cache_system")
+    @classmethod
+    def validate_cache_system(cls, cache_minutes):
+        if cache_minutes is not None and cache_minutes not in [5, 60]:
+            raise ValueError("cache_system must be 5 (minutes), 60 (minutes), or None")
+        return cache_minutes
 
     @model_validator(mode="after")
     def validate_temperature_top_p(self):
@@ -377,8 +396,9 @@ class _Shared:
                 )
 
             # Add cache control if needed
-            if prompt.options.cache and user_content:
-                user_content[-1]["cache_control"] = {"type": "ephemeral"}
+            if prompt.options.cache_prompt in [5, 60] and user_content:
+                cache_control = {"type": "ephemeral", "ttl": "5m" if prompt.options.cache_prompt == 5 else "1h"}
+                user_content[-1]["cache_control"] = cache_control
 
         # Add current prompt's tool results
         if prompt.tool_results:
@@ -400,13 +420,15 @@ class _Shared:
             messages.append({"role": "user", "content": user_content})
 
         # Handle cache control for messages without attachments
-        elif prompt.options.cache and messages:
+        elif prompt.options.cache_prompt in [5, 60] and messages:
             last_message = messages[-1]
             if isinstance(last_message.get("content"), list):
-                last_message["content"][-1]["cache_control"] = {"type": "ephemeral"}
+                cache_control = {"type": "ephemeral", "ttl": "5m" if prompt.options.cache_prompt == 5 else "1h"}
+                last_message["content"][-1]["cache_control"] = cache_control
             else:
                 # This should not happen with our new structure, but keeping as a fallback
-                last_message["cache_control"] = {"type": "ephemeral"}
+                cache_control = {"type": "ephemeral", "ttl": "5m" if prompt.options.cache_prompt == 5 else "1h"}
+                last_message["cache_control"] = cache_control
 
         # Add prefill if specified
         if prompt.options.prefill:
@@ -440,7 +462,17 @@ class _Shared:
             kwargs["top_k"] = prompt.options.top_k
 
         if prompt.system:
-            kwargs["system"] = prompt.system
+            if prompt.options.cache_system in [5, 60]:
+                cache_control = {"type": "ephemeral", "ttl": "5m" if prompt.options.cache_system == 5 else "1h"}
+                kwargs["system"] = [
+                    {
+                        "type": "text",
+                        "text": prompt.system,
+                        "cache_control": cache_control
+                    }
+                ]
+            else:
+                kwargs["system"] = prompt.system
 
         if prompt.options.stop_sequences:
             kwargs["stop_sequences"] = prompt.options.stop_sequences
@@ -500,7 +532,7 @@ class _Shared:
         output_tokens = usage.pop("output_tokens")
         # Only include usage details if prompt caching was on
         details = None
-        if response.prompt.options.cache:
+        if response.prompt.options.cache_prompt in [5, 60] or response.prompt.options.cache_system in [5, 60]:
             details = usage
         response.set_usage(input=input_tokens, output=output_tokens, details=details)
 
@@ -524,7 +556,7 @@ class _Shared:
 
 class ClaudeMessages(_Shared, llm.KeyModel):
     def execute(self, prompt, stream, response, conversation, key):
-        client = Anthropic(api_key=self.get_key(key))
+        client = Anthropic(api_key=self.get_key(key), default_headers={"anthropic-beta": "prompt-caching-2024-07-31,extended-cache-ttl-2025-04-11"})
         kwargs = self.build_kwargs(prompt, conversation)
         prefill_text = self.prefill_text(prompt)
         if "betas" in kwargs:
@@ -562,7 +594,7 @@ class ClaudeMessages(_Shared, llm.KeyModel):
 
 class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
     async def execute(self, prompt, stream, response, conversation, key):
-        client = AsyncAnthropic(api_key=self.get_key(key))
+        client = AsyncAnthropic(api_key=self.get_key(key), default_headers={"anthropic-beta": "prompt-caching-2024-07-31,extended-cache-ttl-2025-04-11"})
         kwargs = self.build_kwargs(prompt, conversation)
         if "betas" in kwargs:
             messages_client = client.beta.messages

@@ -93,6 +93,61 @@ By default up to 1024 tokens can be used for thinking. You can increase this bud
 llm -m claude-3.7-sonnet -o thinking_budget 32000 'Write a long speech about pelicans in French'
 ```
 
+
+## Prompt Caching
+
+This plugin supports Anthropic's prompt caching feature, which can significantly reduce costs and improve response times for repeated or similar prompts. You can enable caching for both user prompts and system prompts with configurable durations.
+
+### Cache Duration Options
+
+- `5` - 5-minute cache (shorter duration, good for development and testing)
+- `60` - 1-hour cache (longer duration, cost-effective for production use)
+- `None` - No caching (default)
+
+### CLI Examples
+
+**Enable 5-minute caching for user prompt only:**
+```bash
+llm -m claude-3.5-sonnet -o cache_prompt 5 \
+  "Generate Python code for data analysis"
+```
+
+**Enable 1-hour caching for both user and system prompts:**
+```bash
+llm -m claude-3.5-sonnet -s "You are an expert data analyst" \
+  -o cache_prompt 60 -o cache_system 60 \
+  "Explain PCA in detail"
+```
+
+**Cache user prompt with 5-minute duration, system prompt with 1-hour duration:**
+```bash
+llm -m claude-3.5-sonnet -s "You are an expert data analyst" \
+  -o cache_prompt 5 -o cache_system 60 \
+  "Generate some advanced SQL queries"
+```
+
+### Python API Examples
+
+```python
+from llm import query
+
+# Enable 1-hour caching for both prompts
+response = query(
+    model="claude-3.7-sonnet",
+    query="Explain quantum computing concepts",
+    system="You are a quantum physics professor",
+    cache_prompt=60,
+    cache_system=60,
+)
+
+# Enable 5-minute caching for user prompt only
+response = query(
+    model="claude-3.5-sonnet",
+    query="Write code for catching exceptions in Python",
+    cache_prompt=5,  # No need to specify cache_system for system-only prompts
+)
+```
+
 ## Model options
 
 The following options can be passed using `-o name value` on the CLI or as `keyword=value` arguments to the Python `model.prompt()` method:
@@ -158,9 +213,13 @@ cog.out("".join(output))
 
     Custom text sequences that will cause the model to stop generating - pass either a list of strings or a single string
 
-- **cache**: `boolean`
+- **cache_prompt**: `int`
 
-    Use Anthropic prompt cache for any attachments or fragments
+    Cache duration for user prompt in minutes. Use 5 for 5-minute cache, 60 for 1-hour cache, or None to disable caching
+
+- **cache_system**: `int`
+
+    Cache duration for system prompt in minutes. Use 5 for 5-minute cache, 60 for 1-hour cache, or None to disable caching
 
 - **thinking**: `boolean`
 
