@@ -71,6 +71,11 @@ Example output:
 }
 ```
 
+Newer models support web search for real-time information:
+```bash
+llm -m claude-3.5-sonnet -o web_search 1 'What is the current weather in San Francisco?'
+```
+
 ## Extended reasoning with Claude 3.7 Sonnet
 
 Claude 3.7 introduced [extended thinking](https://www.anthropic.com/news/visible-extended-thinking) mode, where Claude can expend extra effort thinking through the prompt before producing a response.
@@ -161,6 +166,26 @@ cog.out("".join(output))
 - **cache**: `boolean`
 
     Use Anthropic prompt cache for any attachments or fragments
+
+- **web_search**: `boolean`
+
+    Enable web search capabilities
+
+- **web_search_max_uses**: `int`
+
+    Maximum number of web searches to perform per request
+
+- **web_search_allowed_domains**: `array`
+
+    List of domains to restrict web searches to
+
+- **web_search_blocked_domains**: `array`
+
+    List of domains to exclude from web searches
+
+- **web_search_location**: `dict`
+
+    User location for localizing search results (dict with city, region, country, timezone)
 
 - **thinking**: `boolean`
 

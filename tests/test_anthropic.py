@@ -271,3 +271,19 @@ def test_tools():
     assert [
         result.output for result in chain_response._responses[1].prompt.tool_results
     ] == ["Charles", "Sammy"]
+
+
+@pytest.mark.vcr
+def test_web_search():
+    model = llm.get_model("claude-3.5-sonnet")
+    model.key = model.key or ANTHROPIC_API_KEY
+    response = model.prompt(
+        "What is the current weather in San Francisco?",
+        web_search=True
+    )
+    response_text = str(response)
+    assert len(response_text) > 0
+    assert any(word in response_text.lower() for word in ["weather", "temperature", "san francisco", "degree", "forecast"])
+    response_dict = dict(response.response_json)
+    assert "content" in response_dict
+    assert len(response_dict["content"]) > 0
