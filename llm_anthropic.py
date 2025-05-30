@@ -41,24 +41,24 @@ def register_models(register):
     )
     register(
         ClaudeMessages(
-            "claude-3-5-sonnet-20241022", supports_pdf=True, default_max_tokens=8192
+            "claude-3-5-sonnet-20241022", supports_pdf=True, supports_web_search=True, default_max_tokens=8192
         ),
         AsyncClaudeMessages(
-            "claude-3-5-sonnet-20241022", supports_pdf=True, default_max_tokens=8192
+            "claude-3-5-sonnet-20241022", supports_pdf=True, supports_web_search=True, default_max_tokens=8192
         ),
     )
     register(
         ClaudeMessages(
-            "claude-3-5-sonnet-latest", supports_pdf=True, default_max_tokens=8192
+            "claude-3-5-sonnet-latest", supports_pdf=True, supports_web_search=True, default_max_tokens=8192
         ),
         AsyncClaudeMessages(
-            "claude-3-5-sonnet-latest", supports_pdf=True, default_max_tokens=8192
+            "claude-3-5-sonnet-latest", supports_pdf=True, supports_web_search=True, default_max_tokens=8192
         ),
         aliases=("claude-3.5-sonnet", "claude-3.5-sonnet-latest"),
     )
     register(
-        ClaudeMessages("claude-3-5-haiku-latest", default_max_tokens=8192),
-        AsyncClaudeMessages("claude-3-5-haiku-latest", default_max_tokens=8192),
+        ClaudeMessages("claude-3-5-haiku-latest", supports_web_search=True, default_max_tokens=8192),
+        AsyncClaudeMessages("claude-3-5-haiku-latest", supports_web_search=True, default_max_tokens=8192),
         aliases=("claude-3.5-haiku",),
     )
     # 3.7
@@ -67,12 +67,14 @@ def register_models(register):
             "claude-3-7-sonnet-20250219",
             supports_pdf=True,
             supports_thinking=True,
+            supports_web_search=True,
             default_max_tokens=8192,
         ),
         AsyncClaudeMessages(
             "claude-3-7-sonnet-20250219",
             supports_pdf=True,
             supports_thinking=True,
+            supports_web_search=True,
             default_max_tokens=8192,
         ),
     )
@@ -81,12 +83,14 @@ def register_models(register):
             "claude-3-7-sonnet-latest",
             supports_pdf=True,
             supports_thinking=True,
+            supports_web_search=True,
             default_max_tokens=8192,
         ),
         AsyncClaudeMessages(
             "claude-3-7-sonnet-latest",
             supports_pdf=True,
             supports_thinking=True,
+            supports_web_search=True,
             default_max_tokens=8192,
         ),
         aliases=("claude-3.7-sonnet", "claude-3.7-sonnet-latest"),
@@ -96,12 +100,14 @@ def register_models(register):
             "claude-opus-4-0",
             supports_pdf=True,
             supports_thinking=True,
+            supports_web_search=True,
             default_max_tokens=8192,
         ),
         AsyncClaudeMessages(
             "claude-opus-4-0",
             supports_pdf=True,
             supports_thinking=True,
+            supports_web_search=True,
             default_max_tokens=8192,
         ),
         aliases=("claude-4-opus",),
@@ -111,12 +117,14 @@ def register_models(register):
             "claude-sonnet-4-0",
             supports_pdf=True,
             supports_thinking=True,
+            supports_web_search=True,
             default_max_tokens=8192,
         ),
         AsyncClaudeMessages(
             "claude-sonnet-4-0",
             supports_pdf=True,
             supports_thinking=True,
+            supports_web_search=True,
             default_max_tokens=8192,
         ),
         aliases=("claude-4-sonnet",),
@@ -186,6 +194,31 @@ class ClaudeOptions(llm.Options):
         default=None,
     )
 
+    web_search: Optional[bool] = Field(
+        description="Enable web search capabilities",
+        default=None,
+    )
+
+    web_search_max_uses: Optional[int] = Field(
+        description="Maximum number of web searches to perform per request",
+        default=None,
+    )
+
+    web_search_allowed_domains: Optional[List[str]] = Field(
+        description="List of domains to restrict web searches to",
+        default=None,
+    )
+
+    web_search_blocked_domains: Optional[List[str]] = Field(
+        description="List of domains to exclude from web searches",
+        default=None,
+    )
+
+    web_search_location: Optional[dict] = Field(
+        description="User location for localizing search results (dict with city, region, country, timezone)",
+        default=None,
+    )
+
     @field_validator("stop_sequences")
     def validate_stop_sequences(cls, stop_sequences):
         error_msg = "stop_sequences must be a list of strings or a single string"
@@ -227,10 +260,45 @@ class ClaudeOptions(llm.Options):
             raise ValueError("top_k must be a positive integer")
         return top_k
 
+    @field_validator("web_search_max_uses")
+    @classmethod
+    def validate_web_search_max_uses(cls, max_uses):
+        if max_uses is not None and max_uses <= 0:
+            raise ValueError("web_search_max_uses must be a positive integer")
+        return max_uses
+
+    @field_validator("web_search_allowed_domains", "web_search_blocked_domains")
+    @classmethod
+    def validate_web_search_domains(cls, domains):
+        if domains is not None:
+            if not isinstance(domains, list):
+                raise ValueError("web_search domains must be a list of strings")
+            if not all(isinstance(domain, str) for domain in domains):
+                raise ValueError("web_search domains must be a list of strings")
+        return domains
+
+    @field_validator("web_search_location")
+    @classmethod
+    def validate_web_search_location(cls, location):
+        if location is not None:
+            if not isinstance(location, dict):
+                raise ValueError("web_search_location must be a dictionary")
+            required_fields = {"city", "region", "country", "timezone"}
+            if not all(field in location for field in required_fields):
+                raise ValueError(f"web_search_location must contain: {required_fields}")
+        return location
+
     @model_validator(mode="after")
     def validate_temperature_top_p(self):
         if self.temperature != 1.0 and self.top_p is not None:
             raise ValueError("Only one of temperature and top_p can be set")
+        return self
+
+    @model_validator(mode="after")
+    def validate_web_search_domains_conflict(self):
+        if (self.web_search_allowed_domains is not None and
+            self.web_search_blocked_domains is not None):
+            raise ValueError("Cannot use both web_search_allowed_domains and web_search_blocked_domains")
         return self
 
 
@@ -266,6 +334,7 @@ class _Shared:
     supports_thinking = False
     supports_schema = True
     supports_tools = True
+    supports_web_search = False
     default_max_tokens = 4096
 
     class Options(ClaudeOptions): ...
@@ -277,6 +346,7 @@ class _Shared:
         supports_images=True,
         supports_pdf=False,
         supports_thinking=False,
+        supports_web_search=False,
         default_max_tokens=None,
     ):
         self.model_id = "anthropic/" + model_id
@@ -298,6 +368,7 @@ class _Shared:
             self.Options = ClaudeOptionsWithThinking
         if default_max_tokens is not None:
             self.default_max_tokens = default_max_tokens
+        self.supports_web_search = supports_web_search
 
     def prefill_text(self, prompt):
         if prompt.options.prefill and not prompt.options.hide_prefill:
@@ -435,6 +506,15 @@ class _Shared:
             raise ValueError(
                 "llm-anthropic does not yet support using both schema and tools in the same prompt"
             )
+
+        # Validate web search support
+        if prompt.options.web_search and not self.supports_web_search:
+            raise ValueError(
+                f"Web search is not supported by model {self.model_id}. "
+                f"Supported models include: claude-3.5-sonnet-latest, claude-3.5-haiku-latest, "
+                f"claude-3.7-sonnet-latest, claude-4-opus, claude-4-sonnet"
+            )
+
         kwargs = {
             "model": self.claude_model_id,
             "messages": self.build_messages(prompt, conversation),
@@ -483,6 +563,31 @@ class _Shared:
                 kwargs["extra_body"] = {"thinking": kwargs.pop("thinking")}
 
         tools = []
+
+        # Add web search tool if enabled
+        if prompt.options.web_search:
+            web_search_tool = {
+                "type": "web_search_20250305",
+                "name": "web_search",
+            }
+
+            # Add optional web search parameters
+            if prompt.options.web_search_max_uses:
+                web_search_tool["max_uses"] = prompt.options.web_search_max_uses
+
+            if prompt.options.web_search_allowed_domains:
+                web_search_tool["allowed_domains"] = prompt.options.web_search_allowed_domains
+
+            if prompt.options.web_search_blocked_domains:
+                web_search_tool["blocked_domains"] = prompt.options.web_search_blocked_domains
+
+            if prompt.options.web_search_location:
+                location = prompt.options.web_search_location.copy()
+                location["type"] = "approximate"  # Required by API
+                web_search_tool["user_location"] = location
+
+            tools.append(web_search_tool)
+
         if prompt.schema:
             tools.append(
                 {
@@ -513,9 +618,9 @@ class _Shared:
         usage = response.response_json.pop("usage")
         input_tokens = usage.pop("input_tokens")
         output_tokens = usage.pop("output_tokens")
-        # Only include usage details if prompt caching was on
+        # Only include usage details if prompt caching was on or web search was used
         details = None
-        if response.prompt.options.cache:
+        if response.prompt.options.cache or usage.get("server_tool_use"):
             details = usage
         response.set_usage(input=input_tokens, output=output_tokens, details=details)
 
