@@ -134,12 +134,14 @@ def register_models(register):
             "claude-opus-4-1-20250805",
             supports_pdf=True,
             supports_thinking=True,
+            supports_web_search=True,
             default_max_tokens=8192,
         ),
         AsyncClaudeMessages(
             "claude-opus-4-1-20250805",
             supports_pdf=True,
             supports_thinking=True,
+            supports_web_search=True,
             default_max_tokens=8192,
         ),
         aliases=("claude-opus-4.1",),
@@ -512,7 +514,7 @@ class _Shared:
             raise ValueError(
                 f"Web search is not supported by model {self.model_id}. "
                 f"Supported models include: claude-3.5-sonnet-latest, claude-3.5-haiku-latest, "
-                f"claude-3.7-sonnet-latest, claude-4-opus, claude-4-sonnet"
+                f"claude-3.7-sonnet-latest, claude-4-opus, claude-4-sonnet, claude-opus-4.1"
             )
 
         kwargs = {
