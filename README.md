@@ -45,22 +45,22 @@ Run `llm models` to list the models, and `llm models --options` to include a lis
 Run prompts like this:
 ```bash
 llm -m claude-opus-4.1 'Fun facts about walruses'
-llm -m claude-4-sonnet 'Fun facts about pelicans'
+llm -m claude-sonnet-4.5 'Fun facts about pelicans'
 llm -m claude-3.5-haiku 'Fun facts about armadillos'
 ```
 Image attachments are supported too:
 ```bash
-llm -m claude-4-sonnet 'describe this image' -a https://static.simonwillison.net/static/2024/pelicans.jpg
+llm -m claude-sonnet-4.5 'describe this image' -a https://static.simonwillison.net/static/2024/pelicans.jpg
 llm -m claude-3.5-haiku 'extract text' -a page.png
 ```
 The Claude 3.5 and 4 models can handle PDF files:
 ```bash
-llm -m claude-4-sonnet 'extract text' -a page.pdf
+llm -m claude-sonnet-4.5 'extract text' -a page.pdf
 ```
 Anthropic's models support [schemas](https://llm.datasette.io/en/stable/schemas.html). Here's how to use Claude 4 Sonnet to invent a dog:
 
 ```bash
-llm -m claude-4-sonnet --schema 'name,age int,bio: one sentence' 'invent a surprising dog'
+llm -m claude-sonnet-4.5 --schema 'name,age int,bio: one sentence' 'invent a surprising dog'
 ```
 Example output:
 ```json
@@ -175,7 +175,7 @@ cog.out("".join(output))
 The `prefill` option can be used to set the first part of the response. To increase the chance of returning JSON, set that to `{`:
 
 ```bash
-llm -m claude-4-sonnet 'Fun data about pelicans' \
+llm -m claude-sonnet-4.5 'Fun data about pelicans' \
   -o prefill '{'
 ```
 If you do not want the prefill token to be echoed in the response, set `hide_prefill` to `true`:
@@ -190,13 +190,13 @@ This example sets `` ``` `` as the stop sequence, so the response will be a Pyth
 
 To pass a single stop sequence, send a string:
 ```bash
-llm -m claude-4-sonnet 'Fun facts about pelicans' \
+llm -m claude-sonnet-4.5 'Fun facts about pelicans' \
   -o stop-sequences "beak"
 ```
 For multiple stop sequences, pass a JSON array:
 
 ```bash
-llm -m claude-4-sonnet 'Fun facts about pelicans' \
+llm -m claude-sonnet-4.5 'Fun facts about pelicans' \
   -o stop-sequences '["beak", "feathers"]'
 ```
 
@@ -204,7 +204,7 @@ When using the Python API, pass a string or an array of strings:
 
 ```python
 response = llm.query(
-    model="claude-4-sonnet",
+    model="claude-sonnet-4.5",
     query="Fun facts about pelicans",
     stop_sequences=["beak", "feathers"],
 )
