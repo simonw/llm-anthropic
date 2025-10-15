@@ -1,0 +1,239 @@
+interactions:
+- request:
+    body: '{"max_tokens":8192,"messages":[{"role":"user","content":[{"type":"text","text":"What
+      is the current weather in San Francisco?"}]}],"model":"claude-3-5-sonnet-latest","temperature":1.0,"tools":[{"type":"web_search_20250305","name":"web_search"}],"stream":true}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      anthropic-version:
+      - '2023-06-01'
+      connection:
+      - keep-alive
+      content-length:
+      - '259'
+      content-type:
+      - application/json
+      host:
+      - api.anthropic.com
+      user-agent:
+      - Anthropic/Python 0.52.1
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 0.52.1
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.13.2
+      x-stainless-stream-helper:
+      - messages
+      x-stainless-timeout:
+      - NOT_GIVEN
+    method: POST
+    uri: https://api.anthropic.com/v1/messages
+  response:
+    body:
+      string: "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_01RMmnAV553xeZ7kyYC3speS\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"claude-3-5-sonnet-20241022\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":2684,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":1,\"service_tier\":\"standard\"}}
+        \      }\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}
+        \      }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"Let\"}
+        \     }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"
+        me search for the current weather in San Francisco.\"}               }\n\nevent:
+        ping\ndata: {\"type\": \"ping\"}\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0
+        \       }\n\nevent: ping\ndata: {\"type\": \"ping\"}\n\nevent: content_block_start\ndata:
+        {\"type\":\"content_block_start\",\"index\":1,\"content_block\":{\"type\":\"server_tool_use\",\"id\":\"srvtoolu_017uoh4CSsQkL5sFYuUUUUzp\",\"name\":\"web_search\",\"input\":{}}
+        }\n\nevent: ping\ndata: {\"type\": \"ping\"}\n\nevent: content_block_delta\ndata:
+        {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"\"}
+        \       }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{\\\"query\\\":
+        \\\"\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"San
+        Fra\"}      }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"ncisco
+        \"}            }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"weather
+        toda\"}  }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"y
+        Ma\"}         }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"y
+        30 20\"}      }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"25\"}
+        }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"\\\"}\"}
+        \              }\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":1
+        \   }\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":2,\"content_block\":{\"type\":\"web_search_tool_result\",\"tool_use_id\":\"srvtoolu_017uoh4CSsQkL5sFYuUUUUzp\",\"content\":[{\"type\":\"web_search_result\",\"title\":\"San
+        Francisco, CA Monthly Weather | AccuWeather\",\"url\":\"https://www.accuweather.com/en/us/san-francisco/94103/may-weather/347629\",\"encrypted_content\":\"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\",\"page_age\":null},{\"type\":\"web_search_result\",\"title\":\"San
+        Francisco weather in May 2025 | Weather25.com\",\"url\":\"https://www.weather25.com/north-america/usa/california/san-francisco?page=month&month=May\",\"encrypted_content\":\"EtcICioIBBgCIiQ3ZDZmMDFlZC1iNGI4LTQ4YWEtYjQ4Yi04MDc3MmM5YjFhMzISDCrP5QgjWIkfg6ra5hoMMeOuKrPd8GhQqea6IjCItIeHrVkypXA3BDViUNImdqziBqzCT900tbk7aU11LCBj+sFpp25QT+9F/1/NEDUq2gdJZUonpMd0f7rn1BdmdDxVlAiooaGO3I5uALQFep4SWsVtxtKaabhubquyAA3AU3bykW5cYFY7/H1F5Ix5Twy2DeqezMXlvOmIY5V/A8hvGZoubl/xHUZJ340GELIu+WptafihpOsbMHvTFgHRdC8QSQ+LdwzvxARUyiHQgyTkMvdKXrEzOMayfOodkP/4SCym6zepSKsG8vUYr6+MucQP9flagXdAi/SwHpfpn3bkvdxRM9UCYJnQ1AD1z//uQ3QrV0NWfJo0ci2B0wPSeHsy6dmoRFxxxz7AvFHzjNhyvMf/F33ahSqgCLnGT/KwtLhs8k/lP1DPXrMp08OkpFTYi1owSLoIkncyK+tl+b3jzhy+eSAOZUDTFPdEMBytEf++YBUm//kR0l4KgIuSzdsLlk4BuS0/1iqwIIOfyKEHlEW9FufWg/SusAzQhuNjVXGHlmd81lYrtm11mKnnINLUyOhYjgNgyifLMXR9Am73iDUZhlYB12TPY96H64XtMWa5IuVWs95kwnAKugvwSy+320BdUQjvO9/6o0GvowEan4gDmhvqkKMCARinqxEqcytQejtvE/Y7JCfopcOcHmP0yS+seT+P7SWXC7sz46o4vGmBtAp7TkuYNHEs2EYzD2LBlsvNkZpLJcN8V2v8Td1a09DBEIWeITw2BFA+LJb3Op5QQsJ0d8wGbBwrmE7Gljhw64xCWHKoyCUWbixCFRFGskeIds+f55sJAyrLGxR9Qt+LdzktL2w8P4y9KYj+j1BFTOmRh2+3O8mc9RMIUXgaA2+yl1Omcyi3HRsCsNYqggLKsxg2a7gVXMnE1waTyVylIAN0z8gvi9b1Cc3FgE2IIRcWhAeiHsqaT2RBKFGHBZVsB0oCf3+505INimBcHuhJrj5llBLwb6rFE4PziWN/SjQkr2i2i9HTga93hasRKoFj96Ed6ebegiPc5UeMFbYAQJ4M/DGvgy1EvCpqZS6jB3Yv95Cb+FUm8L2JHrWscaLLELoQXzP6TP8pczHT0qI4/sxiKjbX05bDi724qMe10xMjtdVhwKw2JoIAoRCbF8e9mDmVoUaHQisTT6agK6z1b0FIBnreNugG/A5PjoPH97VmfJaGDl2y5Oz8NeNByGx3mgI8Hg0XODCWAifQeAIR2hIEb1u/6wIkeiTRINYhVKWkIY+yVnOqThQi+0EnLnpI+IspRsv8NRZ7C0m2reM5/V9TdsPJe5R6w5C9qleX5Qr1/Qi0L2PGbauEz9GozpPYmzWTgYqGvlUmEWhqlEi8AmnavfDr44EiXfDb2mhHF2w3SxQFTduVQhgD\",\"page_age\":null},{\"type\":\"web_search_result\",\"title\":\"San
+        Francisco weather in May 2025 | California, USA\",\"url\":\"https://www.weather2travel.com/california/san-francisco/may/\",\"encrypted_content\":\"EuwKCioIBBgCIiQ3ZDZmMDFlZC1iNGI4LTQ4YWEtYjQ4Yi04MDc3MmM5YjFhMzISDL7ew1tjlGCxBMIbhRoMLdr7QVx2/V1qpDeWIjDoHKxrycp5nMNsxIsd9XOYwbXHHFo7T/D8ug2gvys64lTF77E9MHlACFO6aE5AjUwq7wmMGBaoA4mXo2R50pj3yeQSORTSRdjXeG41BSd1JXBEvYH2I6owSSdOJyPDD/McjadPObfMeRrE6Lp/bRzuVffnbkqDeRhJGL027lLYjY+vr0mtUl3UTkr4hnSHVjNJio0U5DSQYvGglzlnwAqrGAAqLScuUmHoQJ8ZkUY8dlwLCEev2WXJoTmEVhTeACkcjoyndBUGKInWWGEweinhTL3AoF99mD2+4Rd0NsaA5v9HhV3LGYhZToujfjYTKk+/EvR/oL8C/F79qLusvgZmSlJal8FMvyIDLg8dPVxhyxPqyCpCmLFTHWFGv5kTR//l+2L49E7UgNr5ANuW3w9JHYMsdZDZzh+QiJWkAwD+/CZN/dqvTQmwzU3dLT+LoxYSpgHSl8tzZBFNv7Jh41+z5oY6QaAjGpMivvbCLKiqoZZzRZ7ZfslTwJFEqWlAtPE+IIj+ZmsnTjd5dp3UFwu96YlxHY9UsWGDLmHpbWakC0+CQOvrJLwsJDt37Gw56wBVUSHLZ2rfO7GXNfzoZUfLvnjpZa59AyWedoAWm5CohswvoojqUtH2iyLXe3AsZaDFreAYO/1x9RE14Mud6vXBMOuPcs+Kei59a4gHnKxpiSE6Wv+h1RbcAM2FCNfl0kNabPzqTxbr0hRgF5ie1oGzsmitzXdAUNp2cmF2uDhbXj7dK6B9pNE/DZEcSPMiz6QZ8W+MwAFzMJKv8uQmlq6F3DmyXgyUtKBJOW8bioIIDCKvKa1dR3/wuwchLTrFb57t+ectZaJkdmw5heRyJs7Io+N3Dc9V58C0xF4pqO1RA7FJwD9gzyssobFEPHhvY/y/b1F4Q5AFw3372bCBH6kCtjTQSM+s0nnwiF0Vu8OHbGhhj+Xie28ZSWTzmBVimVid62nGAmtBlOP9eiuEPJLTxZLVT3CnK6uAVpNql0TiVY/eC0rrrCgqf466O7cjyv5BCufKfk7yJtzAzmqurwk+O2A7wupXAzqSh4dRw/Di8eVtsRIqtdCu1IKIYFo6BJMubgy48L/CJV8uizvdSZaCTJPlfFRc9pgPWSMBsQoRHu1PIezqEwbg+dxO7CSvwi7SnvWxfwklXEQVADf/cOZAsENt0nAm7m4OZAwk9FEDgi+5GZQgn2ulTnhTR6KH+RgkJQsW0mclmdigKmQdVZC3nkwnaP4mkOcU8Gv1FRuJh2w6/VXHEZ3z8SU00zqVHYJKBctjTnlT6ue0koiSEalx1BsX5xB5f8XrqnMSKjLmHtQHyrGa5oPRPT+jzsieoGRO7c+z86RpPeC75OOZbh32KAhR9wF6jZCPZqoOsZN0gOv2vYFKWfLslllz3jO4VfHl6IS73248GtmHCM8YPavdB5a/BL+7KqB6pd7WHIdpjAGh6UVGcyLDGLMK6a8k1QU2PawEogH2r0M3WQFXwYKxiyzGykKwuYtdnKudJo/C3slOboh2948hLIu1IC9r0KVFwPRHE54QiOFE3FWzefwkeGb/uhbmc/WijCEDaP7cZhAg16IGnIjTelQxtQnnA4VzLL562LX60Kd+0PUsgliyXq9SE5oBKo/KVNYaFx3E8NPjWtUXZzODWDkl2wz0t0qE19fFoPTeWSiTuuvypnBlabnnJuMRqXGXMBajTLYEsgwYUqMKNtAnBE2bKTaCyiyPETx0hhLE/Z5dtN74SdBzHigYAw==\",\"page_age\":null},{\"type\":\"web_search_result\",\"title\":\"California
+        is bracing for the first major heat stretch of 2025. Here\u2019s how hot it
+        will get\",\"url\":\"https://www.sfchronicle.com/weather-forecast/article/california-heat-wave-may-2025-20345059.php\",\"encrypted_content\":\"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\",\"page_age\":\"4
+        days ago\"},{\"type\":\"web_search_result\",\"title\":\"Weather in San Francisco
+        in May 2025 - Detailed Forecast\",\"url\":\"https://www.easeweather.com/north-america/united-states/california/city-and-county-of-san-francisco/san-francisco/may\",\"encrypted_content\":\"EuoFCioIBBgCIiQ3ZDZmMDFlZC1iNGI4LTQ4YWEtYjQ4Yi04MDc3MmM5YjFhMzISDMXQ7cVJCuSSyhR04hoMhnXiA1tTXpfrgVCOIjBtZa9DLIfkSOTeN/Ki7AyRVY9hjEINaCwntT9XpkNNErvgKNIWcw5hOFCaAbWUr8kq7QQL02fEx0MPEJ4MSGARBzb1p8mtXLkZ/Q3eLdXiBDLhQg5Thtf3IGE6S4EniowH3jTtdkdaEhBn5LysygZltjK5jzg/5yKxEcbQTDyOG/8lJ71yea2MLQzyqqG3T2PmnfJq22f2DZXgA7lwZrCkPyADob6iYwAKIW9rnkxPcbzCqrbZdXo3deJ6beVV/lWbfNOl50Kh0TEyyQva/GG+FXsngZvH+DwIMoMvulMu+GxuvkUyAcnunOsNSfOn0Kuaetcv/Ho6B5spkSun5J0tCNc7X0DGPKf5rer/58Sev4mSrzSTpg2gDTgmkH8LUs49uQLh1EPOCnBEIQuAX+WTDgpf/jPLndBcOWfPDKxa5PavfQml7ulo3wb6o3BBMWGuA29OrEkui2+sqVDxN8dqF31H5n69fN1GN6ddCtJHAHMw2trpvLZoS0ixk1HAwEIZM/UIx6T56LoDyIOzmYgv8xw+bGuCo3+1obOQAgjTxSkKNrwIqaw1INmvAGLWxgEIQ9yWhcbB8jpeNMdaoTdL2nw+w4iJIBqUh1XmyJ1q7z0lahRR2dconXUB+vqblu/Tf2ksPpPtE1+q69lx123xQBpv0IDUMnH+wea3wDpoYo5NHaZg8n1YPGTEotSVcyZPMAkw7oV65XXQHqjBs9SG2h4fFISQ1IeiXUYTcKTTjiU28aBsOk8JVpcWSw4DO5hADNpWdbp4UeMYWjEVcNAfkHZBSdii59HQ5P9SPJbU9wLSVFUN4ahB1Ludl83g7+e4IR685Ep5XvBfmu+t7fcvfNghNDHPYH6lgPPvtiHchQkqL/FReY7J9C2Yy/kyCb0YAw==\",\"page_age\":\"2
+        weeks ago\"},{\"type\":\"web_search_result\",\"title\":\"60-Day Extended Weather
+        Forecast for San Francisco, CA | Almanac.com\",\"url\":\"https://www.almanac.com/weather/longrange/ca/San%20Francisco\",\"encrypted_content\":\"EqsDCioIBBgCIiQ3ZDZmMDFlZC1iNGI4LTQ4YWEtYjQ4Yi04MDc3MmM5YjFhMzISDLMEiUoyjCpRwmkBFxoMTFL0ex5mo/FuFCcQIjAztPb++7nEepwoPGi0XQ2nEPPt+bMS+NlHufsa156VyzPZz2V9zcuQTiiKe8LGPGAqrgJJCZJTCzvPpujJoKLTfD5P0be1TZeKZqmKVmo1PBnxjkIKGmB2cmw6yIPTUHaSaX70b83zJaFVSnmxRQIVl9T4ryzT7xgIoehMl/G0GDEh55DicobNWKq7KrAXHd6x140DmBAIbYzmLe8PYGG1GQqfnx7XZS/Los9ssiPQqR115q1VipdDDJTFCM1OO1aihR283cIlcCRgrRmEs3Kytx7D+jt3drkYsUjQQx5u6Eqlm2EW2ikNFjWmkYgL7AR05DpsgUcv4MD/VGg1bPjrAlXN0dgEaGPmXm1zd/fahWxmXSf9XSFDHMdszGFAKjtwaaIRBkWECieVUbc/j7+GDQ9mVyJkpfvOeY60ohWfHw6Vd6iVHlSvvGNb1DPc+3foaZMOzLzJ+YNWFaFK9IexnRgD\",\"page_age\":null},{\"type\":\"web_search_result\",\"title\":\"San
+        Francisco 30 days weather forecast, San Francisco weather forecast | QWeather\",\"url\":\"https://www.qweather.com/en/weather30d/san-francisco-93AC7.html\",\"encrypted_content\":\"EpkCCioIBBgCIiQ3ZDZmMDFlZC1iNGI4LTQ4YWEtYjQ4Yi04MDc3MmM5YjFhMzISDERHm0EgUzASjyVEUxoMC+waLQyBG3hjMZSUIjCEakNfxWRWBr1hHLWgxlPqr3mUy7Ugc2zejgjU8pHytPs1evc7qsYwBgvK4jjPjlsqnAHhZpaGkby5vlCM6rlqYRwPkOGK1DAYfzujQGzpeae2rz6Wsi+NL2eUbzshE3ksgDyvVGvRTHhH13m5tGBLe2jAkmyXH2wbCKlC3zwcQJ0HT7lh3BWBqTXqtBUoHbnkKFiLmn+uYIpJATGuf23SUyN5AINXNF2qrgf8HGWdaSV2ssCfpuT5ol+xx/fW0zmMcnArz0A6366nGJb7O/oYAw==\",\"page_age\":null},{\"type\":\"web_search_result\",\"title\":\"Weather
+        in San Francisco in May 2025 (California) - detailed Weather Forecast for
+        a month\",\"url\":\"https://world-weather.info/forecast/usa/san_francisco/may-2025/\",\"encrypted_content\":\"Ev0DCioIBBgCIiQ3ZDZmMDFlZC1iNGI4LTQ4YWEtYjQ4Yi04MDc3MmM5YjFhMzISDG+mV+LnYoGEN+j07BoMXZVkDs4KIJKxfvnUIjD/1xVLrHboxb4OUcxP9Dh00hn2ykMs4fmO1lNX2O0JkhD2GJlcwYoZ+HPfUMyyXbUqgAPn3bUwDHL1D/HNiuw3RbM6guQM95XrvIBuLhX0ZfsBD3smryJn/z3fozVVm4kbNZUiJTdBtWHWwp3RVhpobXd2QKDTKHy2ESI9cA4jLQWl4r5vLPjCHmuYCzeESZN8ok9Yp6tMkSjna9eCNM5HLzK7eofgKtRUKNtkPk/Udz5/OYd4YG1yF9vBVo2XbpnkYPtn20RWLFD6lk2UkXNQTzvMkibDh8FlF5l+VnUPOG6p3x2pOB425g8Z5UbwSZH1/o5naMKJWCRYi8W16E8SZnfBNtD1yhrDf7FT50pxmND2WnU9TJ2q2/Gpyx2k9wAWdWJOv3VAjxe5aD9v0WQEPc7Klzpq+u6QhKyCHg2kR1hKRtdrx7GWPeHbZGVtAb0CRN/IOhnuHs+1f6l/+m5Gk8P2TwEUeibHqf5KnGv7bMisOReZnHd7J0YpAWc1JXiyjZG7nPyd1W4Pw7xF7Vp5eeHdxNsJSn9b4nH2wRTymZ8HfzH7rQVWsp/WIRVTm0XwbPMYAw==\",\"page_age\":null},{\"type\":\"web_search_result\",\"title\":\"San
+        Francisco 30-Day Forecast - Monthly Weather in San Francisco, California\",\"url\":\"https://world-weather.info/forecast/usa/san_francisco/month/\",\"encrypted_content\":\"EpcFCioIBBgCIiQ3ZDZmMDFlZC1iNGI4LTQ4YWEtYjQ4Yi04MDc3MmM5YjFhMzISDIREvhUJbAWq2sDNChoMmLPAOKia7uVdY/gmIjDvhqxaGVFLxIwsOc26XBBe/jAJVP1SFnM84RX3hP8U11nWfT2VgF7eq37EJheIkzQqmgQXfl5Gw73/vzBRRg+ICAbAA1r0wghl+Wi5kqJwndcVCJv6r2fRd/TOZ5sYm3LfI708DJEmRrdk49m1oluIIqyQtx+oNvlFS9lKR4KqJpEW4u3VnmhWqNktmWyqHeXdZg95UVgan0t73EJQdq8wEyh//RCj4LNA+LZX/HkvtOMdV0G5/UWjMBHEjENiO3ocgGcMfEDfAZsidCIGQJxNxZ037kTuHzxyRp4z+wln+1hWJruhvCfqslm4QHOtWa26TxZfVESJ8EtygRgflCo+wx9Yg4/0iXOZVomb3DE06LCeSb+e77nr3eXQE+JeYxP0ndn0YTAfdqi3OaTnAZKPQGXfpchpC17BfJDesMk8oOlSYn0qJDQ3UKmeIPOphTawZRNcE3nOLqcCz0r7txcw8wqDoTjT2T1IdNBx6GIV/6LENlngD8ETxxB1PaxRaWCm63cVZsplDmbuvYEDQ6sLug+VmGdSgu/LRkYqTsHJYrI25p7vLhs3vymqmkuqiWb1y4t+L6MGR7MA+JKm8o4MZ2aYVgTWcS0bCfpS1PVJnNVN5p+SmYKpEVdH4yeryknmdHTEkdoEVDMd1igWHrPTebBZvIhK7bqyuMGfPnpdzWc+daNYtMJ131oGTT7nPsN4AkZZ7mYFlD32z3ubsrr0Hw9i5Yu+hjjlHk+rhJygXVV1s5fQTk1FyaGdpMihIt6LmWfDR/+cInCn6lDSGAM=\",\"page_age\":null},{\"type\":\"web_search_result\",\"title\":\"Past
+        Weather in San Francisco, California, USA \u2014 Yesterday or Further Back\",\"url\":\"https://www.timeanddate.com/weather/usa/san-francisco/historic\",\"encrypted_content\":\"EtAGCioIBBgCIiQ3ZDZmMDFlZC1iNGI4LTQ4YWEtYjQ4Yi04MDc3MmM5YjFhMzISDPX6yyQmc4oaPfwrLRoMLLUi7WnGv2lLkuHAIjAqCLBtQ8/41oesJd2dlUEsgpKMAMLKHuay02q4pjYwiKdgHxOTo6CltxiTfqfYdnMq0wVuXnAzcKdsF4SVN5wLDT1ucvkSAe5Jc+IpEBlpXnmew2a07TsDHcoR82XINxepLL2eqco/6+yPQ7D1k0IgH1HVTzr4Wz2nz7kqgkNoQzj/wsuEkAut4ISI0EUjnPwIQHE4ZpzKYOi+DbJO8RibzDMEOWAveWHrMfmRoKTFPgsnT7qP0dwST0MokriBKBPgNaYmsiO3KCBZpOKH+XhqhFZorD26ozeowLsnU9+ygio4hpdUl4vj5yBYYVjZYV3Ntii1InrCcGyLeaDJ7hHNDLRMADyqDsnbEu8PmVc9FOO2nRHCG82fuHTaEPB0VQpY0Y7BOYI308zcpuYXzofuzIFDSnjNPYZpdE8XQX7Nwr3OntBzjbbEDm84kJ2l5o45Buwl5kdzaRvFlSR+t51cnvN2RlKZvmo6m1snHOKJjTeIW68TJQeDq6Yxa8zk57ehukHSP+muZSEUyehzTb6wcaeLe8PHAwrKLta+eaDj6e+/XCSbMb9Hldtiaui32NarBZaRrLBtxKeYso/CBlJWB5bb6W51+nXi0m2m5yTZgPSDsZ1Lv7qdIGRak9gRvPUnA0FQ8uLIG48qlkePHQD2LrjVTkJwRs6iuU13TpwmfqXrL7eoRvB7qk6zzV0cVO8PUY2WcNtKGp9bxO4XGob7p4rHJEPrZgbcePQSBos9eCaceBXWpa1+ilFhx6U6ru3ODkndib12vN9Pq9/zLfMz/GTDtpMVmrt/K5ehLzda7XRgVM6SSXdfBgTfqvIA3Y0IHoSCnTy0H7zqx7//gZ9U8QG36LSEqaHJDkKReHUQJKI+7vG7y4QmjuZV6kx5d3NaS/4G6gzWD27CTAECuZj/4LpI8tl36slwmH4nb0G6231li2AMuECoQj31cSiZzEroVAOWnENXGEvqz9hqMZrHTR5iaX+GLFh4511X6Idlrg2D/YWtOUZIkCIZrh47RHfSiLXREwcYAw==\",\"page_age\":null}]}
+        \    }\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":2
+        \          }\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":3,\"content_block\":{\"type\":\"text\",\"text\":\"\"}
+        \  }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":3,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\n\\nBased
+        on the search\"}            }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":3,\"delta\":{\"type\":\"text_delta\",\"text\":\"
+        results, here is the current\"} }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":3,\"delta\":{\"type\":\"text_delta\",\"text\":\"
+        weather in San Francisco:\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":3,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\n\\n\"}
+        \              }\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":3
+        \ }\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":4,\"content_block\":{\"citations\":[],\"type\":\"text\",\"text\":\"\"}
+        \ }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":4,\"delta\":{\"type\":\"citations_delta\",\"citation\":{\"type\":\"web_search_result_location\",\"cited_text\":\"Currently:
+        59 \xB0F. Partly sunny. \",\"url\":\"https://www.timeanddate.com/weather/usa/san-francisco/historic\",\"title\":\"Past
+        Weather in San Francisco, California, USA \u2014 Yesterday or Further Back\",\"encrypted_index\":\"EpIBCioIBBgCIiQ3ZDZmMDFlZC1iNGI4LTQ4YWEtYjQ4Yi04MDc3MmM5YjFhMzISDLwp1J328gaOEdtZIRoMQEx8bkeUhPq1nacyIjA9O9L6FgBJ+1YnoM/qACArBe+vOGPo1zLTRaphwfbkzr2J5uK/32ld6GVxkJwAt0wqFhJbTCPzdD6EPxKU+hst/6oqnLB9hxwYBA==\"}}
+        \        }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":4,\"delta\":{\"type\":\"text_delta\",\"text\":\"It
+        is currently 59\xB0F and partly sunny\"}    }\n\nevent: content_block_stop\ndata:
+        {\"type\":\"content_block_stop\",\"index\":4  }\n\nevent: content_block_start\ndata:
+        {\"type\":\"content_block_start\",\"index\":5,\"content_block\":{\"type\":\"text\",\"text\":\"\"}
+        \     }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":5,\"delta\":{\"type\":\"text_delta\",\"text\":\".
+        \\n\\nAdditional current\"}        }\n\nevent: content_block_delta\ndata:
+        {\"type\":\"content_block_delta\",\"index\":5,\"delta\":{\"type\":\"text_delta\",\"text\":\"
+        conditions show that:\\n-\"}   }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":5,\"delta\":{\"type\":\"text_delta\",\"text\":\"
+        \"}}\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":5
+        \         }\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":6,\"content_block\":{\"citations\":[],\"type\":\"text\",\"text\":\"\"}
+        \             }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":6,\"delta\":{\"type\":\"citations_delta\",\"citation\":{\"type\":\"web_search_result_location\",\"cited_text\":\"It
+        will stay cool and breezy, with highs in the upper 50s at the beach and low
+        60s elsewhere. Winds gusting 25 to 35 mph through the Golden Gate will ...\",\"url\":\"https://www.sfchronicle.com/weather-forecast/article/california-heat-wave-may-2025-20345059.php\",\"title\":\"California
+        is bracing for the first major heat stretch of 2025. Here\u2019s how hot it
+        will get\",\"encrypted_index\":\"EpEBCioIBBgCIiQ3ZDZmMDFlZC1iNGI4LTQ4YWEtYjQ4Yi04MDc3MmM5YjFhMzISDIQPJLmTWTCzsvWI1hoMz4IDhr+XmCpS5T/MIjAaO977JT5qlU9ZHpvNJpf84wXULninZbyU/wsbXrQYVFd41w0vPZctZzCUc6R1vdsqFRl2VVb+yrAnW20+fqzh71j2tT3CAxgE\"}}
+        \            }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":6,\"delta\":{\"type\":\"text_delta\",\"text\":\"It's
+        cool and breezy with\"}          }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":6,\"delta\":{\"type\":\"text_delta\",\"text\":\"
+        winds gusting 25 to\"}             }\n\nevent: content_block_delta\ndata:
+        {\"type\":\"content_block_delta\",\"index\":6,\"delta\":{\"type\":\"text_delta\",\"text\":\"
+        35 mph through the Golden\"}               }\n\nevent: content_block_delta\ndata:
+        {\"type\":\"content_block_delta\",\"index\":6,\"delta\":{\"type\":\"text_delta\",\"text\":\"
+        Gate, making it feel even ch\"}       }\n\nevent: content_block_delta\ndata:
+        {\"type\":\"content_block_delta\",\"index\":6,\"delta\":{\"type\":\"text_delta\",\"text\":\"illier\"}
+        \       }\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":6
+        \             }\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":7,\"content_block\":{\"type\":\"text\",\"text\":\"\"}
+        \ }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":7,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\n-
+        \"}          }\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":7
+        \       }\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":8,\"content_block\":{\"citations\":[],\"type\":\"text\",\"text\":\"\"}
+        \       }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":8,\"delta\":{\"type\":\"citations_delta\",\"citation\":{\"type\":\"web_search_result_location\",\"cited_text\":\"The
+        Mission and Potrero Hill might see some sun by afternoon, but the west side
+        stays cloudy. \",\"url\":\"https://www.sfchronicle.com/weather-forecast/article/california-heat-wave-may-2025-20345059.php\",\"title\":\"California
+        is bracing for the first major heat stretch of 2025. Here\u2019s how hot it
+        will get\",\"encrypted_index\":\"Eo8BCioIBBgCIiQ3ZDZmMDFlZC1iNGI4LTQ4YWEtYjQ4Yi04MDc3MmM5YjFhMzISDPTWdinfl07UYHUE3hoMEySpTfSWC05cfljuIjBvqhjuf7Oz0TvF+CpwmsEklyLmNqx6Ab4CHQAwXaUvDAbleGdumMZJrx1Wq2DBMgwqE7pNgNYyYFz2esIMqaLnakiXtmYYBA==\"}}}\n\nevent:
+        content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":8,\"delta\":{\"type\":\"text_delta\",\"text\":\"The
+        Mission and Potrero Hill might see some sun by afternoon,\"}       }\n\nevent:
+        content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":8,\"delta\":{\"type\":\"text_delta\",\"text\":\"
+        though the west side stays\"} }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":8,\"delta\":{\"type\":\"text_delta\",\"text\":\"
+        cloudy\"}     }\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":8
+        \    }\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":9,\"content_block\":{\"type\":\"text\",\"text\":\"\"}
+        \       }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":9,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\n\\nLooking
+        ahead for the next few days:\"}      }\n\nevent: content_block_delta\ndata:
+        {\"type\":\"content_block_delta\",\"index\":9,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\n-
+        \"}    }\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":9
+        }\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":10,\"content_block\":{\"citations\":[],\"type\":\"text\",\"text\":\"\"}
+        \  }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":10,\"delta\":{\"type\":\"citations_delta\",\"citation\":{\"type\":\"web_search_result_location\",\"cited_text\":\"Monday
+        night stays breezy and overcast, with lows near 50. Tuesday brings quicker
+        clearing and a slight warmup, with highs in the low to mid-60s, but ...\",\"url\":\"https://www.sfchronicle.com/weather-forecast/article/california-heat-wave-may-2025-20345059.php\",\"title\":\"California
+        is bracing for the first major heat stretch of 2025. Here\u2019s how hot it
+        will get\",\"encrypted_index\":\"EpIBCioIBBgCIiQ3ZDZmMDFlZC1iNGI4LTQ4YWEtYjQ4Yi04MDc3MmM5YjFhMzISDPMZlYFF7d3O9fM1oBoMeeHg9TJkGzeP3u4/IjB0WxwyaoI1m3fcIEYCH+ZFlqP6uRltAwjIpiBojCIlbI9sSe7tF+FNsNxIquNzQ4IqFhM2EoVWumq+tC0ribGL6x2LFn3NqKUYBA==\"}}
+        }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":10,\"delta\":{\"type\":\"text_delta\",\"text\":\"Tonight
+        will stay breezy and overcast with\"}      }\n\nevent: content_block_delta\ndata:
+        {\"type\":\"content_block_delta\",\"index\":10,\"delta\":{\"type\":\"text_delta\",\"text\":\"
+        lows near 50\xB0F.\"}   }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":10,\"delta\":{\"type\":\"text_delta\",\"text\":\"
+        Tomorrow will bring quicker clearing an\"}     }\n\nevent: content_block_delta\ndata:
+        {\"type\":\"content_block_delta\",\"index\":10,\"delta\":{\"type\":\"text_delta\",\"text\":\"d
+        a slight warmup, with highs in\"}    }\n\nevent: content_block_delta\ndata:
+        {\"type\":\"content_block_delta\",\"index\":10,\"delta\":{\"type\":\"text_delta\",\"text\":\"
+        the low to mid-60s,\"}           }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":10,\"delta\":{\"type\":\"text_delta\",\"text\":\"
+        though it will still feel brisk near\"}  }\n\nevent: content_block_delta\ndata:
+        {\"type\":\"content_block_delta\",\"index\":10,\"delta\":{\"type\":\"text_delta\",\"text\":\"
+        the coast\"}      }\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":10
+        \           }\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":11,\"content_block\":{\"type\":\"text\",\"text\":\"\"}
+        \         }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":11,\"delta\":{\"type\":\"text_delta\",\"text\":\"\\n\\nInterestingly,
+        \"}  }\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":11
+        \             }\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":12,\"content_block\":{\"citations\":[],\"type\":\"text\",\"text\":\"\"}}\n\nevent:
+        content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":12,\"delta\":{\"type\":\"citations_delta\",\"citation\":{\"type\":\"web_search_result_location\",\"cited_text\":\"Coastal
+        areas will stay much cooler in the 60s and 70s, with San Francisco and much
+        of the shoreline pinned under a shallow but persistent marine laye...\",\"url\":\"https://www.sfchronicle.com/weather-forecast/article/california-heat-wave-may-2025-20345059.php\",\"title\":\"California
+        is bracing for the first major heat stretch of 2025. Here\u2019s how hot it
+        will get\",\"encrypted_index\":\"Eo8BCioIBBgCIiQ3ZDZmMDFlZC1iNGI4LTQ4YWEtYjQ4Yi04MDc3MmM5YjFhMzISDMgVzbhMtaKCHl7+8xoMtvxD4dId/Gd8+TiMIjDyXg6yi+48bfs8B3yiqUwII8BltQYmdWI+cSpetsgNHO7Bo2KCaaM78VhoH7g/aBIqE45iuJR7zOEu3Q/bMtdj79o5+k4YBA==\"}}
+        \             }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":12,\"delta\":{\"type\":\"citations_delta\",\"citation\":{\"type\":\"web_search_result_location\",\"cited_text\":\"Temperatures
+        across inland California are set to surge into the 90s and triple digits this
+        week, kicking off the state\u2019s first major heat stretch of t...\",\"url\":\"https://www.sfchronicle.com/weather-forecast/article/california-heat-wave-may-2025-20345059.php\",\"title\":\"California
+        is bracing for the first major heat stretch of 2025. Here\u2019s how hot it
+        will get\",\"encrypted_index\":\"Eo8BCioIBBgCIiQ3ZDZmMDFlZC1iNGI4LTQ4YWEtYjQ4Yi04MDc3MmM5YjFhMzISDIoiR624EJ1Fctt+KhoMNF2AKZWh/8N8JohhIjAJWhhxo8lILLpYu5LRfIi9jiD+fFm4Tynp2XJpUMPH9mn5LzVkGejwf2vbnMtk9DwqEyuu4+z65jyme8O6AMsCUVqL0WMYBA==\"}}
+        \   }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":12,\"delta\":{\"type\":\"text_delta\",\"text\":\"while
+        inland California is set to experience\"}     }\n\nevent: content_block_delta\ndata:
+        {\"type\":\"content_block_delta\",\"index\":12,\"delta\":{\"type\":\"text_delta\",\"text\":\"
+        a heat wave with temperatures sur\"}     }\n\nevent: content_block_delta\ndata:
+        {\"type\":\"content_block_delta\",\"index\":12,\"delta\":{\"type\":\"text_delta\",\"text\":\"ging
+        into the 90s an\"}              }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":12,\"delta\":{\"type\":\"text_delta\",\"text\":\"d
+        triple digits this week, coastal areas like San Francisco will\"}}\n\nevent:
+        content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":12,\"delta\":{\"type\":\"text_delta\",\"text\":\"
+        stay much cooler in the 60s an\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":12,\"delta\":{\"type\":\"text_delta\",\"text\":\"d
+        70s, thanks to a\"}       }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":12,\"delta\":{\"type\":\"text_delta\",\"text\":\"
+        persistent marine layer\"}           }\n\nevent: content_block_stop\ndata:
+        {\"type\":\"content_block_stop\",\"index\":12    }\n\nevent: content_block_start\ndata:
+        {\"type\":\"content_block_start\",\"index\":13,\"content_block\":{\"type\":\"text\",\"text\":\"\"}
+        \     }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":13,\"delta\":{\"type\":\"text_delta\",\"text\":\".\"}
+        \            }\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":13
+        \          }\n\nevent: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\",\"stop_sequence\":null},\"usage\":{\"input_tokens\":10387,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":390,\"server_tool_use\":{\"web_search_requests\":1}}
+        }\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+    headers:
+      CF-RAY:
+      - 947c13a5acc12566-SJC
+      Cache-Control:
+      - no-cache
+      Connection:
+      - keep-alive
+      Content-Type:
+      - text/event-stream; charset=utf-8
+      Date:
+      - Fri, 30 May 2025 06:11:55 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      X-Robots-Tag:
+      - none
+      anthropic-organization-id:
+      - 7d6f01ed-b4b8-48aa-b48b-80772c9b1a32
+      anthropic-ratelimit-input-tokens-limit:
+      - '80000'
+      anthropic-ratelimit-input-tokens-remaining:
+      - '77000'
+      anthropic-ratelimit-input-tokens-reset:
+      - '2025-05-30T06:11:56Z'
+      anthropic-ratelimit-output-tokens-limit:
+      - '16000'
+      anthropic-ratelimit-output-tokens-remaining:
+      - '12000'
+      anthropic-ratelimit-output-tokens-reset:
+      - '2025-05-30T06:12:10Z'
+      anthropic-ratelimit-requests-limit:
+      - '1000'
+      anthropic-ratelimit-requests-remaining:
+      - '999'
+      anthropic-ratelimit-requests-reset:
+      - '2025-05-30T06:11:54Z'
+      anthropic-ratelimit-tokens-limit:
+      - '96000'
+      anthropic-ratelimit-tokens-remaining:
+      - '89000'
+      anthropic-ratelimit-tokens-reset:
+      - '2025-05-30T06:11:56Z'
+      cf-cache-status:
+      - DYNAMIC
+      request-id:
+      - req_011CPdDhDUb7e5tzcUgxTY6g
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      via:
+      - 1.1 google
+    status:
+      code: 200
+      message: OK
+version: 1
