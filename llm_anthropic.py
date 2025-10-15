@@ -152,6 +152,22 @@ def register_models(register):
         ),
         aliases=("claude-sonnet-4.5",),
     )
+    # claude-haiku-4-5
+    register(
+        ClaudeMessages(
+            "claude-haiku-4-5-20251001",
+            supports_pdf=True,
+            supports_thinking=True,
+            default_max_tokens=8192,
+        ),
+        AsyncClaudeMessages(
+            "claude-haiku-4-5-20251001",
+            supports_pdf=True,
+            supports_thinking=True,
+            default_max_tokens=8192,
+        ),
+        aliases=("claude-haiku-4.5",),
+    )
 
 
 class ClaudeOptions(llm.Options):

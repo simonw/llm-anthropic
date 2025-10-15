@@ -47,11 +47,12 @@ Run prompts like this:
 llm -m claude-opus-4.1 'Fun facts about walruses'
 llm -m claude-sonnet-4.5 'Fun facts about pelicans'
 llm -m claude-3.5-haiku 'Fun facts about armadillos'
+llm -m claude-haiku-4.5 'Fun facts about cormorants'
 ```
 Image attachments are supported too:
 ```bash
 llm -m claude-sonnet-4.5 'describe this image' -a https://static.simonwillison.net/static/2024/pelicans.jpg
-llm -m claude-3.5-haiku 'extract text' -a page.png
+llm -m claude-haiku-4.5 'extract text' -a page.png
 ```
 The Claude 3.5 and 4 models can handle PDF files:
 ```bash
