@@ -2,7 +2,6 @@ from anthropic import Anthropic, AsyncAnthropic
 import llm
 import json
 from pydantic import Field, field_validator, model_validator
-from typing import Optional, List, Union
 
 DEFAULT_THINKING_TOKENS = 1024
 DEFAULT_TEMPERATURE = 1.0
@@ -171,49 +170,49 @@ def register_models(register):
 
 
 class ClaudeOptions(llm.Options):
-    max_tokens: Optional[int] = Field(
+    max_tokens: int | None = Field(
         description="The maximum number of tokens to generate before stopping",
         default=None,
     )
 
-    temperature: Optional[float] = Field(
+    temperature: float | None = Field(
         description="Amount of randomness injected into the response. Defaults to 1.0. Ranges from 0.0 to 1.0. Use temperature closer to 0.0 for analytical / multiple choice, and closer to 1.0 for creative and generative tasks. Note that even with temperature of 0.0, the results will not be fully deterministic.",
         default=None,
     )
 
-    top_p: Optional[float] = Field(
+    top_p: float | None = Field(
         description="Use nucleus sampling. In nucleus sampling, we compute the cumulative distribution over all the options for each subsequent token in decreasing probability order and cut it off once it reaches a particular probability specified by top_p. You should either alter temperature or top_p, but not both. Recommended for advanced use cases only. You usually only need to use temperature.",
         default=None,
     )
 
-    top_k: Optional[int] = Field(
+    top_k: int | None = Field(
         description="Only sample from the top K options for each subsequent token. Used to remove 'long tail' low probability responses. Recommended for advanced use cases only. You usually only need to use temperature.",
         default=None,
     )
 
-    user_id: Optional[str] = Field(
+    user_id: str | None = Field(
         description="An external identifier for the user who is associated with the request",
         default=None,
     )
 
-    prefill: Optional[str] = Field(
+    prefill: str | None = Field(
         description="A prefill to use for the response",
         default=None,
     )
 
-    hide_prefill: Optional[bool] = Field(
+    hide_prefill: bool | None = Field(
         description="Do not repeat the prefill value at the start of the response",
         default=None,
     )
 
-    stop_sequences: Optional[Union[list, str]] = Field(
+    stop_sequences: list[str] | str | None = Field(
         description=(
             "Custom text sequences that will cause the model to stop generating - "
             "pass either a list of strings or a single string"
         ),
         default=None,
     )
-    cache: Optional[bool] = Field(
+    cache: bool | None = Field(
         description="Use Anthropic prompt cache for any attachments or fragments",
         default=None,
     )
@@ -267,11 +266,11 @@ class ClaudeOptions(llm.Options):
 
 
 class ClaudeOptionsWithThinking(ClaudeOptions):
-    thinking: Optional[bool] = Field(
+    thinking: bool | None = Field(
         description="Enable thinking mode",
         default=None,
     )
-    thinking_budget: Optional[int] = Field(
+    thinking_budget: int | None = Field(
         description="Number of tokens to budget for thinking", default=None
     )
 
@@ -336,7 +335,7 @@ class _Shared:
             return prompt.options.prefill
         return ""
 
-    def build_messages(self, prompt, conversation) -> List[dict]:
+    def build_messages(self, prompt, conversation) -> list[dict]:
         messages = []
 
         # Process existing conversation history
