@@ -293,6 +293,7 @@ class _Shared:
     needs_key = "anthropic"
     key_env_var = "ANTHROPIC_API_KEY"
     can_stream = True
+    base_url = None
 
     supports_thinking = False
     supports_schema = True
@@ -309,9 +310,11 @@ class _Shared:
         supports_pdf=False,
         supports_thinking=False,
         default_max_tokens=None,
+        base_url=None,
     ):
         self.model_id = "anthropic/" + model_id
         self.claude_model_id = claude_model_id or model_id
+        self.base_url = base_url
         self.attachment_types = set()
         if supports_images:
             self.attachment_types.update(
@@ -570,7 +573,7 @@ class _Shared:
 
 class ClaudeMessages(_Shared, llm.KeyModel):
     def execute(self, prompt, stream, response, conversation, key):
-        client = Anthropic(api_key=self.get_key(key))
+        client = Anthropic(api_key=self.get_key(key), base_url=self.base_url)
         kwargs = self.build_kwargs(prompt, conversation)
         prefill_text = self.prefill_text(prompt)
         if "betas" in kwargs:
@@ -608,7 +611,7 @@ class ClaudeMessages(_Shared, llm.KeyModel):
 
 class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
     async def execute(self, prompt, stream, response, conversation, key):
-        client = AsyncAnthropic(api_key=self.get_key(key))
+        client = AsyncAnthropic(api_key=self.get_key(key), base_url=self.base_url)
         kwargs = self.build_kwargs(prompt, conversation)
         if "betas" in kwargs:
             messages_client = client.beta.messages

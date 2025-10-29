@@ -72,7 +72,30 @@ Example output:
 }
 ```
 
-## Extended reasoning with Claude 3.7 Sonnet
+## Usage from Python
+
+Python code can access the models like this:
+```python
+import llm
+
+model = llm.get_model("claude-haiku-4.5")
+print(model.prompt("Fun facts about chipmunks"))
+```
+Consult [LLM's Python API documentation](https://llm.datasette.io/en/stable/python-api.html) for more details.
+
+You can also import the model classes directly, which is useful if you want to point the `base_url` at a different Anthropic-compatible endpoint:
+```python
+from llm_anthropic import ClaudeMessages
+
+model = ClaudeMessages(
+    "MiniMax-M2",
+    base_url="https://api.minimax.io/anthropic"
+)
+
+print(model.prompt("Fun facts about pangolins", key="eyJh..."))
+```
+
+## Extended reasoning with Claude 3.7 Sonnet and higher
 
 Claude 3.7 introduced [extended thinking](https://www.anthropic.com/news/visible-extended-thinking) mode, where Claude can expend extra effort thinking through the prompt before producing a response.
 
