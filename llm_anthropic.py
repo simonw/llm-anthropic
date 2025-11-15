@@ -1,7 +1,7 @@
 from anthropic import Anthropic, AsyncAnthropic, transform_schema
 import llm
 import json
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, field_validator, model_validator, create_model
 
 DEFAULT_THINKING_TOKENS = 1024
 DEFAULT_TEMPERATURE = 1.0
@@ -344,6 +344,47 @@ class _Shared:
             return prompt.options.prefill
         return ""
 
+    def _json_schema_to_pydantic(self, schema):
+        """Convert a JSON schema to a Pydantic model for use with SDK helpers"""
+        # Map JSON schema types to Python types
+        type_map = {
+            "string": str,
+            "integer": int,
+            "number": float,
+            "boolean": bool,
+            "array": list,
+            "object": dict,
+            "null": type(None),
+        }
+
+        if schema.get("type") != "object":
+            # For non-object schemas, just use dict
+            return dict
+
+        properties = schema.get("properties", {})
+        required_fields = schema.get("required", [])
+        fields = {}
+
+        for prop_name, prop_def in properties.items():
+            prop_type = prop_def.get("type", "string")
+            python_type = type_map.get(prop_type, str)
+
+            # Handle arrays and objects
+            if prop_type == "array":
+                # Simple list type for now
+                python_type = list
+            elif prop_type == "object":
+                python_type = dict
+
+            # Set field as required or optional
+            if prop_name in required_fields:
+                fields[prop_name] = (python_type, ...)
+            else:
+                fields[prop_name] = (python_type, None)
+
+        # Create and return the dynamic model
+        return create_model("DynamicOutputModel", **fields)
+
     def build_messages(self, prompt, conversation) -> list[dict]:
         messages = []
 
@@ -608,11 +649,14 @@ class ClaudeMessages(_Shared, llm.KeyModel):
         else:
             messages_client = client.messages
 
-        # For structured outputs, we can't use the stream() helper (it expects a Pydantic type)
-        # but we can use create(stream=True)
-        use_create_for_streaming = "output_format" in kwargs
+        # For structured outputs, convert JSON schema to Pydantic model for stream()
+        if "output_format" in kwargs and stream:
+            # Extract the schema and convert to Pydantic model
+            schema = kwargs["output_format"]["schema"]
+            pydantic_model = self._json_schema_to_pydantic(schema)
+            kwargs["output_format"] = pydantic_model
 
-        if stream and not use_create_for_streaming:
+        if stream:
             with messages_client.stream(**kwargs) as stream:
                 if prefill_text:
                     yield prefill_text
@@ -624,50 +668,15 @@ class ClaudeMessages(_Shared, llm.KeyModel):
                         elif hasattr(delta, "partial_json") and prompt.schema:
                             yield delta.partial_json
                 # This records usage and other data:
-                last_message = stream.get_final_message().model_dump()
+                # Suppress Pydantic serialization warnings when using dynamic models
+                import warnings
+                with warnings.catch_warnings():
+                    warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
+                    last_message = stream.get_final_message().model_dump()
                 response.response_json = last_message
                 if self.add_tool_usage(response, last_message):
                     # Avoid "can have dragons.Now that I " bug
                     yield " "
-        elif stream and use_create_for_streaming:
-            # For structured outputs, use create(stream=True) instead of stream()
-            kwargs["stream"] = True
-            stream_response = messages_client.create(**kwargs)
-            if prefill_text:
-                yield prefill_text
-
-            # Build response_json from stream chunks
-            message_data = None
-            content_blocks = []
-
-            for chunk in stream_response:
-                if chunk.type == "message_start":
-                    message_data = chunk.message.model_dump()
-                elif chunk.type == "content_block_start":
-                    content_blocks.append({"type": "text", "text": ""})
-                elif chunk.type == "content_block_delta":
-                    if hasattr(chunk.delta, "text"):
-                        content_blocks[chunk.index]["text"] += chunk.delta.text
-                        yield chunk.delta.text
-                    elif hasattr(chunk.delta, "partial_json"):
-                        # For structured outputs, accumulate partial JSON
-                        if "text" not in content_blocks[chunk.index]:
-                            content_blocks[chunk.index]["text"] = ""
-                        content_blocks[chunk.index]["text"] += chunk.delta.partial_json
-                        yield chunk.delta.partial_json
-                elif chunk.type == "message_delta":
-                    if hasattr(chunk.delta, "stop_reason"):
-                        message_data["stop_reason"] = chunk.delta.stop_reason
-                    if hasattr(chunk.delta, "stop_sequence"):
-                        message_data["stop_sequence"] = chunk.delta.stop_sequence
-                    if hasattr(chunk, "usage"):
-                        message_data["usage"] = chunk.usage.model_dump()
-
-            # Finalize response_json
-            if message_data:
-                message_data["content"] = content_blocks
-                response.response_json = message_data
-                self.add_tool_usage(response, message_data)
         else:
             completion = messages_client.create(**kwargs)
             text = "".join(
@@ -690,11 +699,14 @@ class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
             messages_client = client.messages
         prefill_text = self.prefill_text(prompt)
 
-        # For structured outputs, we can't use the stream() helper (it expects a Pydantic type)
-        # but we can use create(stream=True)
-        use_create_for_streaming = "output_format" in kwargs
+        # For structured outputs, convert JSON schema to Pydantic model for stream()
+        if "output_format" in kwargs and stream:
+            # Extract the schema and convert to Pydantic model
+            schema = kwargs["output_format"]["schema"]
+            pydantic_model = self._json_schema_to_pydantic(schema)
+            kwargs["output_format"] = pydantic_model
 
-        if stream and not use_create_for_streaming:
+        if stream:
             async with messages_client.stream(**kwargs) as stream_obj:
                 if prefill_text:
                     yield prefill_text
@@ -705,48 +717,13 @@ class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
                             yield delta.text
                         elif hasattr(delta, "partial_json") and prompt.schema:
                             yield delta.partial_json
-            response.response_json = (await stream_obj.get_final_message()).model_dump()
+            # Suppress Pydantic serialization warnings when using dynamic models
+            import warnings
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
+                response.response_json = (await stream_obj.get_final_message()).model_dump()
             # TODO: Test this:
             self.add_tool_usage(response, response.response_json)
-        elif stream and use_create_for_streaming:
-            # For structured outputs, use create(stream=True) instead of stream()
-            kwargs["stream"] = True
-            stream_response = await messages_client.create(**kwargs)
-            if prefill_text:
-                yield prefill_text
-
-            # Build response_json from stream chunks
-            message_data = None
-            content_blocks = []
-
-            async for chunk in stream_response:
-                if chunk.type == "message_start":
-                    message_data = chunk.message.model_dump()
-                elif chunk.type == "content_block_start":
-                    content_blocks.append({"type": "text", "text": ""})
-                elif chunk.type == "content_block_delta":
-                    if hasattr(chunk.delta, "text"):
-                        content_blocks[chunk.index]["text"] += chunk.delta.text
-                        yield chunk.delta.text
-                    elif hasattr(chunk.delta, "partial_json"):
-                        # For structured outputs, accumulate partial JSON
-                        if "text" not in content_blocks[chunk.index]:
-                            content_blocks[chunk.index]["text"] = ""
-                        content_blocks[chunk.index]["text"] += chunk.delta.partial_json
-                        yield chunk.delta.partial_json
-                elif chunk.type == "message_delta":
-                    if hasattr(chunk.delta, "stop_reason"):
-                        message_data["stop_reason"] = chunk.delta.stop_reason
-                    if hasattr(chunk.delta, "stop_sequence"):
-                        message_data["stop_sequence"] = chunk.delta.stop_sequence
-                    if hasattr(chunk, "usage"):
-                        message_data["usage"] = chunk.usage.model_dump()
-
-            # Finalize response_json
-            if message_data:
-                message_data["content"] = content_blocks
-                response.response_json = message_data
-                self.add_tool_usage(response, message_data)
         else:
             completion = await messages_client.create(**kwargs)
             text = "".join(
