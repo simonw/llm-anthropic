@@ -1,7 +1,8 @@
 from anthropic import Anthropic, AsyncAnthropic, transform_schema
 import llm
 import json
-from pydantic import Field, field_validator, model_validator, create_model
+from pydantic import Field, field_validator, model_validator
+from json_schema_to_pydantic import create_model as json_schema_to_model
 
 DEFAULT_THINKING_TOKENS = 1024
 DEFAULT_TEMPERATURE = 1.0
@@ -346,44 +347,7 @@ class _Shared:
 
     def _json_schema_to_pydantic(self, schema):
         """Convert a JSON schema to a Pydantic model for use with SDK helpers"""
-        # Map JSON schema types to Python types
-        type_map = {
-            "string": str,
-            "integer": int,
-            "number": float,
-            "boolean": bool,
-            "array": list,
-            "object": dict,
-            "null": type(None),
-        }
-
-        if schema.get("type") != "object":
-            # For non-object schemas, just use dict
-            return dict
-
-        properties = schema.get("properties", {})
-        required_fields = schema.get("required", [])
-        fields = {}
-
-        for prop_name, prop_def in properties.items():
-            prop_type = prop_def.get("type", "string")
-            python_type = type_map.get(prop_type, str)
-
-            # Handle arrays and objects
-            if prop_type == "array":
-                # Simple list type for now
-                python_type = list
-            elif prop_type == "object":
-                python_type = dict
-
-            # Set field as required or optional
-            if prop_name in required_fields:
-                fields[prop_name] = (python_type, ...)
-            else:
-                fields[prop_name] = (python_type, None)
-
-        # Create and return the dynamic model
-        return create_model("DynamicOutputModel", **fields)
+        return json_schema_to_model(schema)
 
     def build_messages(self, prompt, conversation) -> list[dict]:
         messages = []
