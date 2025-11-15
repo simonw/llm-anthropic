@@ -1,7 +1,7 @@
 interactions:
 - request:
-    body: '{"max_tokens":8192,"messages":[{"role":"user","content":"Python function
-      describing a pelican"},{"role":"assistant","content":"```python"}],"model":"claude-3-5-haiku-latest","stop_sequences":["```"],"temperature":1.0,"stream":true}'
+    body: '{"max_tokens":8192,"messages":[{"role":"user","content":[{"type":"text","text":"Very
+      short function describing a pelican"}]},{"role":"assistant","content":[{"type":"text","text":"```python"}]}],"model":"claude-3-5-haiku-latest","stop_sequences":["```"],"temperature":1.0,"stream":true}'
     headers:
       accept:
       - application/json
@@ -12,13 +12,13 @@ interactions:
       connection:
       - keep-alive
       content-length:
-      - '231'
+      - '285'
       content-type:
       - application/json
       host:
       - api.anthropic.com
       user-agent:
-      - Anthropic/Python 0.41.0
+      - Anthropic/Python 0.73.0
       x-stainless-arch:
       - arm64
       x-stainless-async:
@@ -28,27 +28,43 @@ interactions:
       x-stainless-os:
       - MacOS
       x-stainless-package-version:
-      - 0.41.0
+      - 0.73.0
+      x-stainless-read-timeout:
+      - '600'
       x-stainless-retry-count:
       - '0'
       x-stainless-runtime:
       - CPython
       x-stainless-runtime-version:
-      - 3.12.0
+      - 3.10.10
       x-stainless-stream-helper:
       - messages
+      x-stainless-timeout:
+      - NOT_GIVEN
     method: POST
     uri: https://api.anthropic.com/v1/messages
   response:
     body:
       string: 'event: message_start
 
-        data: {"type":"message_start","message":{"id":"msg_01Hc6vd1tdGFuu8g31Dtwocw","type":"message","role":"assistant","model":"claude-3-5-haiku-20241022","content":[],"stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":15,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":3}}           }
+        data: {"type":"message_start","message":{"model":"claude-3-5-haiku-20241022","id":"msg_01Vh9gCUUDMykSLHm8Jesir4","type":"message","role":"assistant","content":[],"stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":16,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":0},"output_tokens":3,"service_tier":"standard"}}
+        }
 
 
         event: content_block_start
 
-        data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}             }
+        data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}               }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"\ndef
+        describe"}               }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"_pelican():"}      }
 
 
         event: ping
@@ -58,354 +74,124 @@ interactions:
 
         event: content_block_delta
 
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"\ndef
-        describe"}    }
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"\n    \"\"\""}             }
 
 
         event: content_block_delta
 
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"_pelican():\n    \"\"\"\n    A"}      }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
-        function describing the characteristics of a pelican."}           }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"\n    \n    Returns:\n        "}            }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"A
-        dictionary with various details about pel"}              }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"icans.\n    \"\"\"\n    pel"}         }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"ican_details
-        = {"}             }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"\n        \"species\":
-        \"Pelec"}}
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"anus\",\n        \"habitat\":
-        \"Coastal"}     }
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Returns"}            }
 
 
         event: content_block_delta
 
         data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
-        areas, lakes, and rivers\","}}
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"\n        \"physical_characteristics\":
-        {"}              }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"\n            \"size\":
-        {"}        }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"\n                \"length\":
-        \"1.2"}           }
+        a brief"}         }
 
 
         event: content_block_delta
 
         data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
-        - 1.8 "}              }
+        description of a pelican"}               }
 
 
         event: content_block_delta
 
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"meters\",\n                \"wingspan\":"}   }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
-        \"2 - 3."}             }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"5
-        meters\""}}
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"\n            },\n            \""}       }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"weight\":
-        \"4 - 15"}          }
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":".\"\"\"\n    return"}       }
 
 
         event: content_block_delta
 
         data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
-        kg\",\n            \"distinctive"}    }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"_features\":
-        [\n                \"Large"}          }
+        \"Large"}               }
 
 
         event: content_block_delta
 
         data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
-        throat pouch\",\n                \"Long"}  }
+        se"}     }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"abird
+        with a massive"}               }
 
 
         event: content_block_delta
 
         data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
-        beak\",\n                \""}            }
+        bill"}     }
 
 
         event: content_block_delta
 
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"White
-        or gray plumage\""}      }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"\n            ]\n        },\n        \"diet"}    }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"\":
-        [\n            \"Fish\","}               }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"\n            \"Smaller
-        water"}        }
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":","}      }
 
 
         event: content_block_delta
 
         data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
-        birds\",\n            \""}          }
+        capable"}      }
 
 
         event: content_block_delta
 
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Crustaceans\",\n            \"Amp"}}
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
+        of s"}      }
 
 
         event: content_block_delta
 
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"hibians\"\n        ],\n        \"behavior"}   }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"\":
-        {\n            \"hunting_style"}           }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"\":
-        \"Diving and sco"}}
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"co"}      }
 
 
         event: content_block_delta
 
         data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"oping
-        fish with throat pouch\",\n            \""}}
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"social_nature\":
-        \"Often foun"}   }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"d
-        in large groups\",\n            \"breeding\":"}             }
+        fish"}  }
 
 
         event: content_block_delta
 
         data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
-        \"Colonial nesters\"\n        },"}               }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"\n        \"interesting"}         }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"_facts\":
-        ["}           }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"\n            \"Can
-        hold up to 3"}  }
+        from"}       }
 
 
         event: content_block_delta
 
         data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
-        gallons of water in their"}          }
+        water"}          }
 
 
         event: content_block_delta
 
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
-        pouch\",\n            \""}         }
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":".\""}      }
 
 
         event: content_block_delta
 
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Excellent
-        fish"}    }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"ers\",\n            \"Foun"}     }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"d
-        on every continent except Antarctica\""}        }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"\n        ]\n    }"}     }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"\n    \n    return
-        pelican_"}       }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"details\n\n#"}   }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
-        Example usage\npel"} }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"ican_info"}      }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
-        = describe_pelican"}    }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"()\nprint(\""}         }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Pelican"}    }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
-        Habitat:\", pelican_info"}            }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"[\"habitat\"])\nprint"}            }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"(\"Distinctive"}         }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
-        Features:\", pelican_"}           }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"info[\"physical_characteristics\"][\"distinctive_"}     }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"features\"])\n"}          }
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"\n"}       }
 
 
         event: content_block_stop
 
-        data: {"type":"content_block_stop","index":0 }
+        data: {"type":"content_block_stop","index":0     }
 
 
         event: message_delta
 
-        data: {"type":"message_delta","delta":{"stop_reason":"stop_sequence","stop_sequence":"```"},"usage":{"output_tokens":386}     }
+        data: {"type":"message_delta","delta":{"stop_reason":"stop_sequence","stop_sequence":"```"},"usage":{"input_tokens":16,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":43}      }
 
 
         event: message_stop
 
-        data: {"type":"message_stop"}
+        data: {"type":"message_stop"         }
 
 
         '
     headers:
-      CF-Cache-Status:
-      - DYNAMIC
       CF-RAY:
-      - 90a5a4742d35f7a5-LAX
+      - 99eacab40bdb16fa-SJC
       Cache-Control:
       - no-cache
       Connection:
@@ -413,41 +199,49 @@ interactions:
       Content-Type:
       - text/event-stream; charset=utf-8
       Date:
-      - Fri, 31 Jan 2025 00:39:03 GMT
+      - Sat, 15 Nov 2025 00:56:58 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
       - chunked
       X-Robots-Tag:
       - none
+      anthropic-organization-id:
+      - b320df16-c763-4455-b901-3f7d54e9a012
       anthropic-ratelimit-input-tokens-limit:
       - '400000'
       anthropic-ratelimit-input-tokens-remaining:
       - '400000'
       anthropic-ratelimit-input-tokens-reset:
-      - '2025-01-31T00:39:03Z'
+      - '2025-11-15T00:56:58Z'
       anthropic-ratelimit-output-tokens-limit:
       - '80000'
       anthropic-ratelimit-output-tokens-remaining:
-      - '76000'
+      - '80000'
       anthropic-ratelimit-output-tokens-reset:
-      - '2025-01-31T00:39:06Z'
+      - '2025-11-15T00:56:58Z'
       anthropic-ratelimit-requests-limit:
       - '4000'
       anthropic-ratelimit-requests-remaining:
       - '3999'
       anthropic-ratelimit-requests-reset:
-      - '2025-01-31T00:39:03Z'
+      - '2025-11-15T00:56:58Z'
       anthropic-ratelimit-tokens-limit:
       - '480000'
       anthropic-ratelimit-tokens-remaining:
-      - '476000'
+      - '480000'
       anthropic-ratelimit-tokens-reset:
-      - '2025-01-31T00:39:03Z'
+      - '2025-11-15T00:56:58Z'
+      cf-cache-status:
+      - DYNAMIC
       request-id:
-      - req_014Jc1PrkzF3jzDiWV8f4d1e
-      via:
-      - 1.1 google
+      - req_011CV8mP633bNwcdKJNTY8s9
+      retry-after:
+      - '2'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-envoy-upstream-service-time:
+      - '341'
     status:
       code: 200
       message: OK

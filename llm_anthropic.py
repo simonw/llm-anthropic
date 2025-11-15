@@ -1,8 +1,8 @@
-from anthropic import Anthropic, AsyncAnthropic
+from anthropic import Anthropic, AsyncAnthropic, transform_schema
 import llm
 import json
 from pydantic import Field, field_validator, model_validator
-from typing import Optional, List, Union
+from json_schema_to_pydantic import create_model as json_schema_to_model
 
 DEFAULT_THINKING_TOKENS = 1024
 DEFAULT_TEMPERATURE = 1.0
@@ -135,6 +135,7 @@ def register_models(register):
             supports_pdf=True,
             supports_thinking=True,
             supports_web_search=True,
+            use_structured_outputs=True,
             default_max_tokens=8192,
         ),
         AsyncClaudeMessages(
@@ -142,56 +143,91 @@ def register_models(register):
             supports_pdf=True,
             supports_thinking=True,
             supports_web_search=True,
+            use_structured_outputs=True,
             default_max_tokens=8192,
         ),
         aliases=("claude-opus-4.1",),
     )
+    # claude-sonnet-4-5
+    register(
+        ClaudeMessages(
+            "claude-sonnet-4-5",
+            supports_pdf=True,
+            supports_thinking=True,
+            use_structured_outputs=True,
+            default_max_tokens=8192,
+        ),
+        AsyncClaudeMessages(
+            "claude-sonnet-4-5",
+            supports_pdf=True,
+            supports_thinking=True,
+            use_structured_outputs=True,
+            default_max_tokens=8192,
+        ),
+        aliases=("claude-sonnet-4.5",),
+    )
+    # claude-haiku-4-5
+    register(
+        ClaudeMessages(
+            "claude-haiku-4-5-20251001",
+            supports_pdf=True,
+            supports_thinking=True,
+            default_max_tokens=8192,
+        ),
+        AsyncClaudeMessages(
+            "claude-haiku-4-5-20251001",
+            supports_pdf=True,
+            supports_thinking=True,
+            default_max_tokens=8192,
+        ),
+        aliases=("claude-haiku-4.5",),
+    )
 
 
 class ClaudeOptions(llm.Options):
-    max_tokens: Optional[int] = Field(
+    max_tokens: int | None = Field(
         description="The maximum number of tokens to generate before stopping",
         default=None,
     )
 
-    temperature: Optional[float] = Field(
+    temperature: float | None = Field(
         description="Amount of randomness injected into the response. Defaults to 1.0. Ranges from 0.0 to 1.0. Use temperature closer to 0.0 for analytical / multiple choice, and closer to 1.0 for creative and generative tasks. Note that even with temperature of 0.0, the results will not be fully deterministic.",
         default=None,
     )
 
-    top_p: Optional[float] = Field(
+    top_p: float | None = Field(
         description="Use nucleus sampling. In nucleus sampling, we compute the cumulative distribution over all the options for each subsequent token in decreasing probability order and cut it off once it reaches a particular probability specified by top_p. You should either alter temperature or top_p, but not both. Recommended for advanced use cases only. You usually only need to use temperature.",
         default=None,
     )
 
-    top_k: Optional[int] = Field(
+    top_k: int | None = Field(
         description="Only sample from the top K options for each subsequent token. Used to remove 'long tail' low probability responses. Recommended for advanced use cases only. You usually only need to use temperature.",
         default=None,
     )
 
-    user_id: Optional[str] = Field(
+    user_id: str | None = Field(
         description="An external identifier for the user who is associated with the request",
         default=None,
     )
 
-    prefill: Optional[str] = Field(
+    prefill: str | None = Field(
         description="A prefill to use for the response",
         default=None,
     )
 
-    hide_prefill: Optional[bool] = Field(
+    hide_prefill: bool | None = Field(
         description="Do not repeat the prefill value at the start of the response",
         default=None,
     )
 
-    stop_sequences: Optional[Union[list, str]] = Field(
+    stop_sequences: list[str] | str | None = Field(
         description=(
             "Custom text sequences that will cause the model to stop generating - "
             "pass either a list of strings or a single string"
         ),
         default=None,
     )
-    cache: Optional[bool] = Field(
+    cache: bool | None = Field(
         description="Use Anthropic prompt cache for any attachments or fragments",
         default=None,
     )
@@ -305,11 +341,11 @@ class ClaudeOptions(llm.Options):
 
 
 class ClaudeOptionsWithThinking(ClaudeOptions):
-    thinking: Optional[bool] = Field(
+    thinking: bool | None = Field(
         description="Enable thinking mode",
         default=None,
     )
-    thinking_budget: Optional[int] = Field(
+    thinking_budget: int | None = Field(
         description="Number of tokens to budget for thinking", default=None
     )
 
@@ -332,6 +368,7 @@ class _Shared:
     needs_key = "anthropic"
     key_env_var = "ANTHROPIC_API_KEY"
     can_stream = True
+    base_url = None
 
     supports_thinking = False
     supports_schema = True
@@ -349,10 +386,14 @@ class _Shared:
         supports_pdf=False,
         supports_thinking=False,
         supports_web_search=False,
+        use_structured_outputs=False,
         default_max_tokens=None,
+        base_url=None,
     ):
         self.model_id = "anthropic/" + model_id
         self.claude_model_id = claude_model_id or model_id
+        self.base_url = base_url
+        self.use_structured_outputs = use_structured_outputs
         self.attachment_types = set()
         if supports_images:
             self.attachment_types.update(
@@ -377,7 +418,22 @@ class _Shared:
             return prompt.options.prefill
         return ""
 
-    def build_messages(self, prompt, conversation) -> List[dict]:
+    def _model_dump_suppress_warnings(self, message):
+        """
+        Call model_dump() on a message while suppressing Pydantic serialization warnings.
+
+        When using dynamically created Pydantic models with the SDK's stream() helper,
+        the returned ParsedBetaMessage has strict type annotations that don't match
+        our dynamic models, causing harmless serialization warnings. This suppresses
+        those warnings while still producing correct output.
+        """
+        import warnings
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
+            return message.model_dump()
+
+    def build_messages(self, prompt, conversation) -> list[dict]:
         messages = []
 
         # Process existing conversation history
@@ -559,10 +615,28 @@ class _Shared:
         ):
             max_tokens = prompt.options.thinking_budget + 1
         kwargs["max_tokens"] = max_tokens
+
+        # Determine which beta headers to use
+        betas = []
         if max_tokens > 64000:
-            kwargs["betas"] = ["output-128k-2025-02-19"]
+            betas.append("output-128k-2025-02-19")
             if "thinking" in kwargs:
                 kwargs["extra_body"] = {"thinking": kwargs.pop("thinking")}
+
+        # Check if we should use new structured outputs
+        use_structured_outputs = prompt.schema and self.use_structured_outputs
+
+        if use_structured_outputs:
+            # Use new structured outputs mechanism
+            betas.append("structured-outputs-2025-11-13")
+            # Transform schema to ensure it meets structured output requirements
+            kwargs["output_format"] = {
+                "type": "json_schema",
+                "schema": transform_schema(prompt.schema),
+            }
+
+        if betas:
+            kwargs["betas"] = betas
 
         tools = []
 
@@ -590,7 +664,8 @@ class _Shared:
 
             tools.append(web_search_tool)
 
-        if prompt.schema:
+        if prompt.schema and not use_structured_outputs:
+            # Fall back to tools workaround for models that don't support structured outputs
             tools.append(
                 {
                     "name": "output_structured_data",
@@ -646,13 +721,21 @@ class _Shared:
 
 class ClaudeMessages(_Shared, llm.KeyModel):
     def execute(self, prompt, stream, response, conversation, key):
-        client = Anthropic(api_key=self.get_key(key))
+        client = Anthropic(api_key=self.get_key(key), base_url=self.base_url)
         kwargs = self.build_kwargs(prompt, conversation)
         prefill_text = self.prefill_text(prompt)
         if "betas" in kwargs:
             messages_client = client.beta.messages
         else:
             messages_client = client.messages
+
+        # For structured outputs, convert JSON schema to Pydantic model for stream()
+        if "output_format" in kwargs and stream:
+            # Extract the schema and convert to Pydantic model
+            schema = kwargs["output_format"]["schema"]
+            pydantic_model = json_schema_to_model(schema)
+            kwargs["output_format"] = pydantic_model
+
         if stream:
             with messages_client.stream(**kwargs) as stream:
                 if prefill_text:
@@ -665,7 +748,9 @@ class ClaudeMessages(_Shared, llm.KeyModel):
                         elif hasattr(delta, "partial_json") and prompt.schema:
                             yield delta.partial_json
                 # This records usage and other data:
-                last_message = stream.get_final_message().model_dump()
+                last_message = self._model_dump_suppress_warnings(
+                    stream.get_final_message()
+                )
                 response.response_json = last_message
                 if self.add_tool_usage(response, last_message):
                     # Avoid "can have dragons.Now that I " bug
@@ -684,13 +769,21 @@ class ClaudeMessages(_Shared, llm.KeyModel):
 
 class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
     async def execute(self, prompt, stream, response, conversation, key):
-        client = AsyncAnthropic(api_key=self.get_key(key))
+        client = AsyncAnthropic(api_key=self.get_key(key), base_url=self.base_url)
         kwargs = self.build_kwargs(prompt, conversation)
         if "betas" in kwargs:
             messages_client = client.beta.messages
         else:
             messages_client = client.messages
         prefill_text = self.prefill_text(prompt)
+
+        # For structured outputs, convert JSON schema to Pydantic model for stream()
+        if "output_format" in kwargs and stream:
+            # Extract the schema and convert to Pydantic model
+            schema = kwargs["output_format"]["schema"]
+            pydantic_model = json_schema_to_model(schema)
+            kwargs["output_format"] = pydantic_model
+
         if stream:
             async with messages_client.stream(**kwargs) as stream_obj:
                 if prefill_text:
@@ -702,7 +795,9 @@ class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
                             yield delta.text
                         elif hasattr(delta, "partial_json") and prompt.schema:
                             yield delta.partial_json
-            response.response_json = (await stream_obj.get_final_message()).model_dump()
+            response.response_json = self._model_dump_suppress_warnings(
+                await stream_obj.get_final_message()
+            )
             # TODO: Test this:
             self.add_tool_usage(response, response.response_json)
         else:

@@ -1,16 +1,16 @@
 [project]
 name = "llm-anthropic"
-version = "0.19"
+version = "0.21.1"
 description = "LLM access to models by Anthropic, including the Claude series"
 readme = "README.md"
 authors = [{name = "Simon Willison"}]
-license = {text = "Apache-2.0"}
-classifiers = [
-    "License :: OSI Approved :: Apache Software License"
-]
+license = "Apache-2.0"
+requires-python = ">=3.10"
+classifiers = []
 dependencies = [
     "llm>=0.26",
-    "anthropic>=0.48.0",
+    "anthropic>=0.73.0",
+    "json-schema-to-pydantic",
 ]
 
 [project.urls]
