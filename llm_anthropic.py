@@ -7,12 +7,6 @@ from json_schema_to_pydantic import create_model as json_schema_to_model
 DEFAULT_THINKING_TOKENS = 1024
 DEFAULT_TEMPERATURE = 1.0
 
-# Models that support the new structured outputs feature
-STRUCTURED_OUTPUT_MODELS = {
-    "claude-sonnet-4-5",
-    "claude-opus-4-1-20250805",
-}
-
 
 @llm.hookimpl
 def register_models(register):
@@ -132,12 +126,14 @@ def register_models(register):
             "claude-opus-4-1-20250805",
             supports_pdf=True,
             supports_thinking=True,
+            use_structured_outputs=True,
             default_max_tokens=8192,
         ),
         AsyncClaudeMessages(
             "claude-opus-4-1-20250805",
             supports_pdf=True,
             supports_thinking=True,
+            use_structured_outputs=True,
             default_max_tokens=8192,
         ),
         aliases=("claude-opus-4.1",),
@@ -148,12 +144,14 @@ def register_models(register):
             "claude-sonnet-4-5",
             supports_pdf=True,
             supports_thinking=True,
+            use_structured_outputs=True,
             default_max_tokens=8192,
         ),
         AsyncClaudeMessages(
             "claude-sonnet-4-5",
             supports_pdf=True,
             supports_thinking=True,
+            use_structured_outputs=True,
             default_max_tokens=8192,
         ),
         aliases=("claude-sonnet-4.5",),
@@ -316,12 +314,14 @@ class _Shared:
         supports_images=True,
         supports_pdf=False,
         supports_thinking=False,
+        use_structured_outputs=False,
         default_max_tokens=None,
         base_url=None,
     ):
         self.model_id = "anthropic/" + model_id
         self.claude_model_id = claude_model_id or model_id
         self.base_url = base_url
+        self.use_structured_outputs = use_structured_outputs
         self.attachment_types = set()
         if supports_images:
             self.attachment_types.update(
@@ -531,9 +531,7 @@ class _Shared:
                 kwargs["extra_body"] = {"thinking": kwargs.pop("thinking")}
 
         # Check if we should use new structured outputs
-        use_structured_outputs = (
-            prompt.schema and self.claude_model_id in STRUCTURED_OUTPUT_MODELS
-        )
+        use_structured_outputs = prompt.schema and self.use_structured_outputs
 
         if use_structured_outputs:
             # Use new structured outputs mechanism
