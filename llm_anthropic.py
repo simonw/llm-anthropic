@@ -345,10 +345,6 @@ class _Shared:
             return prompt.options.prefill
         return ""
 
-    def _json_schema_to_pydantic(self, schema):
-        """Convert a JSON schema to a Pydantic model for use with SDK helpers"""
-        return json_schema_to_model(schema)
-
     def _model_dump_suppress_warnings(self, message):
         """
         Call model_dump() on a message while suppressing Pydantic serialization warnings.
@@ -359,6 +355,7 @@ class _Shared:
         those warnings while still producing correct output.
         """
         import warnings
+
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
             return message.model_dump()
@@ -629,7 +626,7 @@ class ClaudeMessages(_Shared, llm.KeyModel):
         if "output_format" in kwargs and stream:
             # Extract the schema and convert to Pydantic model
             schema = kwargs["output_format"]["schema"]
-            pydantic_model = self._json_schema_to_pydantic(schema)
+            pydantic_model = json_schema_to_model(schema)
             kwargs["output_format"] = pydantic_model
 
         if stream:
@@ -677,7 +674,7 @@ class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
         if "output_format" in kwargs and stream:
             # Extract the schema and convert to Pydantic model
             schema = kwargs["output_format"]["schema"]
-            pydantic_model = self._json_schema_to_pydantic(schema)
+            pydantic_model = json_schema_to_model(schema)
             kwargs["output_format"] = pydantic_model
 
         if stream:
