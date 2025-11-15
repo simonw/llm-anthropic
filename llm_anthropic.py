@@ -1,6 +1,7 @@
 from anthropic import Anthropic, AsyncAnthropic, transform_schema
 import llm
 import json
+from typing import Optional, List
 from pydantic import Field, field_validator, model_validator
 from json_schema_to_pydantic import create_model as json_schema_to_model
 
@@ -41,24 +42,40 @@ def register_models(register):
     )
     register(
         ClaudeMessages(
-            "claude-3-5-sonnet-20241022", supports_pdf=True, supports_web_search=True, default_max_tokens=8192
+            "claude-3-5-sonnet-20241022",
+            supports_pdf=True,
+            supports_web_search=True,
+            default_max_tokens=8192,
         ),
         AsyncClaudeMessages(
-            "claude-3-5-sonnet-20241022", supports_pdf=True, supports_web_search=True, default_max_tokens=8192
+            "claude-3-5-sonnet-20241022",
+            supports_pdf=True,
+            supports_web_search=True,
+            default_max_tokens=8192,
         ),
     )
     register(
         ClaudeMessages(
-            "claude-3-5-sonnet-latest", supports_pdf=True, supports_web_search=True, default_max_tokens=8192
+            "claude-3-5-sonnet-latest",
+            supports_pdf=True,
+            supports_web_search=True,
+            default_max_tokens=8192,
         ),
         AsyncClaudeMessages(
-            "claude-3-5-sonnet-latest", supports_pdf=True, supports_web_search=True, default_max_tokens=8192
+            "claude-3-5-sonnet-latest",
+            supports_pdf=True,
+            supports_web_search=True,
+            default_max_tokens=8192,
         ),
         aliases=("claude-3.5-sonnet", "claude-3.5-sonnet-latest"),
     )
     register(
-        ClaudeMessages("claude-3-5-haiku-latest", supports_web_search=True, default_max_tokens=8192),
-        AsyncClaudeMessages("claude-3-5-haiku-latest", supports_web_search=True, default_max_tokens=8192),
+        ClaudeMessages(
+            "claude-3-5-haiku-latest", supports_web_search=True, default_max_tokens=8192
+        ),
+        AsyncClaudeMessages(
+            "claude-3-5-haiku-latest", supports_web_search=True, default_max_tokens=8192
+        ),
         aliases=("claude-3.5-haiku",),
     )
     # 3.7
@@ -334,9 +351,13 @@ class ClaudeOptions(llm.Options):
 
     @model_validator(mode="after")
     def validate_web_search_domains_conflict(self):
-        if (self.web_search_allowed_domains is not None and
-            self.web_search_blocked_domains is not None):
-            raise ValueError("Cannot use both web_search_allowed_domains and web_search_blocked_domains")
+        if (
+            self.web_search_allowed_domains is not None
+            and self.web_search_blocked_domains is not None
+        ):
+            raise ValueError(
+                "Cannot use both web_search_allowed_domains and web_search_blocked_domains"
+            )
         return self
 
 
@@ -652,10 +673,14 @@ class _Shared:
                 web_search_tool["max_uses"] = prompt.options.web_search_max_uses
 
             if prompt.options.web_search_allowed_domains:
-                web_search_tool["allowed_domains"] = prompt.options.web_search_allowed_domains
+                web_search_tool["allowed_domains"] = (
+                    prompt.options.web_search_allowed_domains
+                )
 
             if prompt.options.web_search_blocked_domains:
-                web_search_tool["blocked_domains"] = prompt.options.web_search_blocked_domains
+                web_search_tool["blocked_domains"] = (
+                    prompt.options.web_search_blocked_domains
+                )
 
             if prompt.options.web_search_location:
                 location = prompt.options.web_search_location.copy()
