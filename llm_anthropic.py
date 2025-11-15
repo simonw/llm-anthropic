@@ -1,7 +1,8 @@
-from anthropic import Anthropic, AsyncAnthropic
+from anthropic import Anthropic, AsyncAnthropic, transform_schema
 import llm
 import json
 from pydantic import Field, field_validator, model_validator
+from json_schema_to_pydantic import create_model as json_schema_to_model
 
 DEFAULT_THINKING_TOKENS = 1024
 DEFAULT_TEMPERATURE = 1.0
@@ -125,12 +126,14 @@ def register_models(register):
             "claude-opus-4-1-20250805",
             supports_pdf=True,
             supports_thinking=True,
+            use_structured_outputs=True,
             default_max_tokens=8192,
         ),
         AsyncClaudeMessages(
             "claude-opus-4-1-20250805",
             supports_pdf=True,
             supports_thinking=True,
+            use_structured_outputs=True,
             default_max_tokens=8192,
         ),
         aliases=("claude-opus-4.1",),
@@ -141,12 +144,14 @@ def register_models(register):
             "claude-sonnet-4-5",
             supports_pdf=True,
             supports_thinking=True,
+            use_structured_outputs=True,
             default_max_tokens=8192,
         ),
         AsyncClaudeMessages(
             "claude-sonnet-4-5",
             supports_pdf=True,
             supports_thinking=True,
+            use_structured_outputs=True,
             default_max_tokens=8192,
         ),
         aliases=("claude-sonnet-4.5",),
@@ -309,12 +314,14 @@ class _Shared:
         supports_images=True,
         supports_pdf=False,
         supports_thinking=False,
+        use_structured_outputs=False,
         default_max_tokens=None,
         base_url=None,
     ):
         self.model_id = "anthropic/" + model_id
         self.claude_model_id = claude_model_id or model_id
         self.base_url = base_url
+        self.use_structured_outputs = use_structured_outputs
         self.attachment_types = set()
         if supports_images:
             self.attachment_types.update(
@@ -337,6 +344,21 @@ class _Shared:
         if prompt.options.prefill and not prompt.options.hide_prefill:
             return prompt.options.prefill
         return ""
+
+    def _model_dump_suppress_warnings(self, message):
+        """
+        Call model_dump() on a message while suppressing Pydantic serialization warnings.
+
+        When using dynamically created Pydantic models with the SDK's stream() helper,
+        the returned ParsedBetaMessage has strict type annotations that don't match
+        our dynamic models, causing harmless serialization warnings. This suppresses
+        those warnings while still producing correct output.
+        """
+        import warnings
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
+            return message.model_dump()
 
     def build_messages(self, prompt, conversation) -> list[dict]:
         messages = []
@@ -511,13 +533,32 @@ class _Shared:
         ):
             max_tokens = prompt.options.thinking_budget + 1
         kwargs["max_tokens"] = max_tokens
+
+        # Determine which beta headers to use
+        betas = []
         if max_tokens > 64000:
-            kwargs["betas"] = ["output-128k-2025-02-19"]
+            betas.append("output-128k-2025-02-19")
             if "thinking" in kwargs:
                 kwargs["extra_body"] = {"thinking": kwargs.pop("thinking")}
 
+        # Check if we should use new structured outputs
+        use_structured_outputs = prompt.schema and self.use_structured_outputs
+
+        if use_structured_outputs:
+            # Use new structured outputs mechanism
+            betas.append("structured-outputs-2025-11-13")
+            # Transform schema to ensure it meets structured output requirements
+            kwargs["output_format"] = {
+                "type": "json_schema",
+                "schema": transform_schema(prompt.schema),
+            }
+
+        if betas:
+            kwargs["betas"] = betas
+
         tools = []
-        if prompt.schema:
+        if prompt.schema and not use_structured_outputs:
+            # Fall back to tools workaround for models that don't support structured outputs
             tools.append(
                 {
                     "name": "output_structured_data",
@@ -580,6 +621,14 @@ class ClaudeMessages(_Shared, llm.KeyModel):
             messages_client = client.beta.messages
         else:
             messages_client = client.messages
+
+        # For structured outputs, convert JSON schema to Pydantic model for stream()
+        if "output_format" in kwargs and stream:
+            # Extract the schema and convert to Pydantic model
+            schema = kwargs["output_format"]["schema"]
+            pydantic_model = json_schema_to_model(schema)
+            kwargs["output_format"] = pydantic_model
+
         if stream:
             with messages_client.stream(**kwargs) as stream:
                 if prefill_text:
@@ -592,7 +641,9 @@ class ClaudeMessages(_Shared, llm.KeyModel):
                         elif hasattr(delta, "partial_json") and prompt.schema:
                             yield delta.partial_json
                 # This records usage and other data:
-                last_message = stream.get_final_message().model_dump()
+                last_message = self._model_dump_suppress_warnings(
+                    stream.get_final_message()
+                )
                 response.response_json = last_message
                 if self.add_tool_usage(response, last_message):
                     # Avoid "can have dragons.Now that I " bug
@@ -618,6 +669,14 @@ class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
         else:
             messages_client = client.messages
         prefill_text = self.prefill_text(prompt)
+
+        # For structured outputs, convert JSON schema to Pydantic model for stream()
+        if "output_format" in kwargs and stream:
+            # Extract the schema and convert to Pydantic model
+            schema = kwargs["output_format"]["schema"]
+            pydantic_model = json_schema_to_model(schema)
+            kwargs["output_format"] = pydantic_model
+
         if stream:
             async with messages_client.stream(**kwargs) as stream_obj:
                 if prefill_text:
@@ -629,7 +688,9 @@ class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
                             yield delta.text
                         elif hasattr(delta, "partial_json") and prompt.schema:
                             yield delta.partial_json
-            response.response_json = (await stream_obj.get_final_message()).model_dump()
+            response.response_json = self._model_dump_suppress_warnings(
+                await stream_obj.get_final_message()
+            )
             # TODO: Test this:
             self.add_tool_usage(response, response.response_json)
         else:
