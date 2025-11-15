@@ -349,6 +349,20 @@ class _Shared:
         """Convert a JSON schema to a Pydantic model for use with SDK helpers"""
         return json_schema_to_model(schema)
 
+    def _model_dump_suppress_warnings(self, message):
+        """
+        Call model_dump() on a message while suppressing Pydantic serialization warnings.
+
+        When using dynamically created Pydantic models with the SDK's stream() helper,
+        the returned ParsedBetaMessage has strict type annotations that don't match
+        our dynamic models, causing harmless serialization warnings. This suppresses
+        those warnings while still producing correct output.
+        """
+        import warnings
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
+            return message.model_dump()
+
     def build_messages(self, prompt, conversation) -> list[dict]:
         messages = []
 
@@ -630,11 +644,9 @@ class ClaudeMessages(_Shared, llm.KeyModel):
                         elif hasattr(delta, "partial_json") and prompt.schema:
                             yield delta.partial_json
                 # This records usage and other data:
-                # Suppress Pydantic serialization warnings when using dynamic models
-                import warnings
-                with warnings.catch_warnings():
-                    warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
-                    last_message = stream.get_final_message().model_dump()
+                last_message = self._model_dump_suppress_warnings(
+                    stream.get_final_message()
+                )
                 response.response_json = last_message
                 if self.add_tool_usage(response, last_message):
                     # Avoid "can have dragons.Now that I " bug
@@ -679,11 +691,9 @@ class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
                             yield delta.text
                         elif hasattr(delta, "partial_json") and prompt.schema:
                             yield delta.partial_json
-            # Suppress Pydantic serialization warnings when using dynamic models
-            import warnings
-            with warnings.catch_warnings():
-                warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
-                response.response_json = (await stream_obj.get_final_message()).model_dump()
+            response.response_json = self._model_dump_suppress_warnings(
+                await stream_obj.get_final_message()
+            )
             # TODO: Test this:
             self.add_tool_usage(response, response.response_json)
         else:
