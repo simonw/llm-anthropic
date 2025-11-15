@@ -251,6 +251,18 @@ To run the tests:
 pytest
 ```
 
+Alternatively, if you have [uv](https://github.com/astral-sh/uv) and [just](https://github.com/casey/just) installed you can run tests without creating a virtual environment like this:
+```bash
+just        # runs tests (default task)
+just test   # runs tests
+just test -k test_name  # pass arguments to pytest
+```
+
+You can also run the `llm` command in a `uv` managed environment like this:
+```bash
+just llm 'your prompt here'
+```
+
 This project uses [pytest-recording](https://github.com/kiwicom/pytest-recording) to record Anthropic API responses for the tests.
 
 If you add a new test that calls the API you can capture the API response like this:
@@ -267,8 +279,8 @@ I use the following sequence:
 # First delete the relevant cassette if it exists already:
 rm tests/cassettes/test_anthropic/test_thinking_prompt.yaml
 # Run this failing test to recreate the cassette
-PYTEST_ANTHROPIC_API_KEY="$(llm keys get claude)" pytest -k test_thinking_prompt --record-mode once
+PYTEST_ANTHROPIC_API_KEY="$(llm keys get claude)" just test -k test_thinking_prompt --record-mode once
 # Now run the test again with --pdb to figure out how to update it
-pytest -k test_thinking_prompt --pdb
+just test -k test_thinking_prompt --pdb
 # Edit test
 ```
