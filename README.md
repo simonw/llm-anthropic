@@ -262,6 +262,10 @@ You can also run the `llm` command in a `uv` managed environment like this:
 ```bash
 just llm 'your prompt here'
 ```
+To enable debug logs while running ([like this](https://github.com/simonw/llm-anthropic/issues/54#issuecomment-3536842831)), set this environment variable:
+```bash
+export ANTHROPIC_LOG=debug
+```
 
 This project uses [pytest-recording](https://github.com/kiwicom/pytest-recording) to record Anthropic API responses for the tests.
 
