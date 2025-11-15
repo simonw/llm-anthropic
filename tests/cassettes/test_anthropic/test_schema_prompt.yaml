@@ -1,24 +1,26 @@
 interactions:
 - request:
-    body: '{"max_tokens":8192,"messages":[{"role":"user","content":"Invent a good
-      dog"}],"model":"claude-3-7-sonnet-latest","temperature":1.0,"tools":[{"name":"output_structured_data","input_schema":{"properties":{"name":{"title":"Name","type":"string"},"age":{"title":"Age","type":"integer"},"bio":{"title":"Bio","type":"string"}},"required":["name","age","bio"],"title":"Dog","type":"object"}}],"tool_choice":{"type":"tool","name":"output_structured_data"},"stream":true}'
+    body: '{"max_tokens":8192,"messages":[{"role":"user","content":[{"type":"text","text":"Invent
+      a good dog"}]}],"model":"claude-sonnet-4-5","output_format":{"schema":{"type":"object","title":"Dog","properties":{"name":{"type":"string","title":"Name"},"age":{"type":"integer","title":"Age"},"bio":{"type":"string","title":"Bio"}},"additionalProperties":false,"required":["name","age","bio"]},"type":"json_schema"},"temperature":1.0,"stream":true}'
     headers:
       accept:
       - application/json
       accept-encoding:
       - gzip, deflate
+      anthropic-beta:
+      - structured-outputs-2025-11-13
       anthropic-version:
       - '2023-06-01'
       connection:
       - keep-alive
       content-length:
-      - '462'
+      - '436'
       content-type:
       - application/json
       host:
       - api.anthropic.com
       user-agent:
-      - Anthropic/Python 0.47.2
+      - Anthropic/Python 0.73.0
       x-stainless-arch:
       - arm64
       x-stainless-async:
@@ -28,7 +30,7 @@ interactions:
       x-stainless-os:
       - MacOS
       x-stainless-package-version:
-      - 0.47.2
+      - 0.73.0
       x-stainless-read-timeout:
       - '600'
       x-stainless-retry-count:
@@ -36,23 +38,36 @@ interactions:
       x-stainless-runtime:
       - CPython
       x-stainless-runtime-version:
-      - 3.12.0
+      - 3.10.10
       x-stainless-stream-helper:
-      - messages
+      - beta.messages
       x-stainless-timeout:
       - NOT_GIVEN
     method: POST
-    uri: https://api.anthropic.com/v1/messages
+    uri: https://api.anthropic.com/v1/messages?beta=true
   response:
     body:
       string: 'event: message_start
 
-        data: {"type":"message_start","message":{"id":"msg_011RyssDpYDzSyU3zK8Bhvbf","type":"message","role":"assistant","model":"claude-3-7-sonnet-20250219","content":[],"stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":429,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":25}}}
+        data: {"type":"message_start","message":{"model":"claude-sonnet-4-5-20250929","id":"msg_01EC9rUWdnDsNne92QpiUGqR","type":"message","role":"assistant","content":[],"stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":230,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":0},"output_tokens":1,"service_tier":"standard"}}
+        }
 
 
         event: content_block_start
 
-        data: {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"toolu_01BEUcgSZ295kTDkxpovXdpA","name":"output_structured_data","input":{}}            }
+        data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}
+        }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"{\""}              }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"name\":
+        \"B"}      }
 
 
         event: ping
@@ -62,120 +77,213 @@ interactions:
 
         event: content_block_delta
 
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":""}   }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\"n"}      }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"am"}    }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"e\":
-        \""}             }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"Buddy\""}
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"isc"}
         }
 
 
         event: content_block_delta
 
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":",
-        \"age\":"}  }
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"uit\",
+        \"age\": 4"}           }
 
 
         event: content_block_delta
 
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"
-        3"}         }
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":",
+        \"bio\": \"B"}}
 
 
         event: content_block_delta
 
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":",
-        \"bio\":"}    }
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"iscuit
+        is a loyal"}             }
 
 
         event: content_block_delta
 
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"
-        \"Buddy is "}            }
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
+        golden"}               }
 
 
         event: content_block_delta
 
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"a
-        loy"}}
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
+        retriever with"} }
 
 
         event: content_block_delta
 
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"al
-        and "}             }
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
+        a gentle"}          }
 
 
         event: content_block_delta
 
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"ene"}             }
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
+        temperament and boun"}       }
 
 
         event: content_block_delta
 
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"rgetic
-        Gol"}           }
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"dless
+        enthusiasm"}              }
 
 
         event: content_block_delta
 
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"den
-        Ret"}       }
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
+        for"}              }
 
 
         event: content_block_delta
 
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"ri"}        }
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
+        life"}    }
 
 
         event: content_block_delta
 
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"ever
-        w"}              }
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":".
+        He loves"}       }
 
 
         event: content_block_delta
 
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"ho
-        love"}               }
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
+        swimming"}            }
 
 
         event: content_block_delta
 
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"s
-        long wal"}     }
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
+        in"}     }
 
 
         event: content_block_delta
 
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"ks.\"}"}          }
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
+        lakes"}           }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":","}  }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
+        playing fetch until"} }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
+        sunset"}}
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":",
+        and has"} }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
+        an"}   }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
+        unc"}     }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"anny
+        ability to sense when someone"} }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
+        needs comfort. Known"}        }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
+        in"}          }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
+        his neighborhoo"}}
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"d
+        for"}             }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
+        his friendly demeanor,"}}
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
+        Biscuit volunteers"}     }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
+        at the local children"}         }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"''s
+        hospital bringing"}           }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
+        joy to young"}       }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
+        patients"}         }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"."}  }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"\"}"}     }
 
 
         event: content_block_stop
 
-        data: {"type":"content_block_stop","index":0      }
+        data: {"type":"content_block_stop","index":0       }
 
 
         event: message_delta
 
-        data: {"type":"message_delta","delta":{"stop_reason":"tool_use","stop_sequence":null},"usage":{"output_tokens":140}         }
+        data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"input_tokens":230,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":96}       }
 
 
         event: message_stop
@@ -186,7 +294,7 @@ interactions:
         '
     headers:
       CF-RAY:
-      - 9184543f7bb208cb-LAX
+      - 99eaf38458c549fc-SJC
       Cache-Control:
       - no-cache
       Connection:
@@ -194,7 +302,7 @@ interactions:
       Content-Type:
       - text/event-stream; charset=utf-8
       Date:
-      - Thu, 27 Feb 2025 01:16:23 GMT
+      - Sat, 15 Nov 2025 01:24:54 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
@@ -204,35 +312,33 @@ interactions:
       anthropic-organization-id:
       - b320df16-c763-4455-b901-3f7d54e9a012
       anthropic-ratelimit-input-tokens-limit:
-      - '200000'
+      - '2000000'
       anthropic-ratelimit-input-tokens-remaining:
-      - '200000'
+      - '2000000'
       anthropic-ratelimit-input-tokens-reset:
-      - '2025-02-27T01:16:22Z'
+      - '2025-11-15T01:24:50Z'
       anthropic-ratelimit-output-tokens-limit:
-      - '80000'
+      - '400000'
       anthropic-ratelimit-output-tokens-remaining:
-      - '76000'
+      - '400000'
       anthropic-ratelimit-output-tokens-reset:
-      - '2025-02-27T01:16:25Z'
-      anthropic-ratelimit-requests-limit:
-      - '4000'
-      anthropic-ratelimit-requests-remaining:
-      - '3999'
-      anthropic-ratelimit-requests-reset:
-      - '2025-02-27T01:16:22Z'
+      - '2025-11-15T01:24:50Z'
       anthropic-ratelimit-tokens-limit:
-      - '280000'
+      - '2400000'
       anthropic-ratelimit-tokens-remaining:
-      - '276000'
+      - '2400000'
       anthropic-ratelimit-tokens-reset:
-      - '2025-02-27T01:16:22Z'
+      - '2025-11-15T01:24:50Z'
       cf-cache-status:
       - DYNAMIC
       request-id:
-      - req_01R68QTrbL1hYTBF3ozzrsxj
-      via:
-      - 1.1 google
+      - req_011CV8oWKLvhXUDMFqY1Siz4
+      retry-after:
+      - '10'
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-envoy-upstream-service-time:
+      - '4017'
     status:
       code: 200
       message: OK
