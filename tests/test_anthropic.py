@@ -267,7 +267,7 @@ def test_tools():
 
 @pytest.mark.vcr
 def test_web_search():
-    model = llm.get_model("claude-3.5-sonnet")
+    model = llm.get_model("claude-opus-4.1")
     model.key = model.key or ANTHROPIC_API_KEY
     response = model.prompt(
         "What is the current weather in San Francisco?", web_search=True
