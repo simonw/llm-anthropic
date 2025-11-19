@@ -1,6 +1,6 @@
 [project]
 name = "llm-anthropic"
-version = "0.21.1"
+version = "0.22"
 description = "LLM access to models by Anthropic, including the Claude series"
 readme = "README.md"
 authors = [{name = "Simon Willison"}]
