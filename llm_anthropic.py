@@ -659,13 +659,16 @@ class _Shared:
         if prompt.options.stop_sequences:
             kwargs["stop_sequences"] = prompt.options.stop_sequences
 
+        thinking_effort_enabled = (
+            self.supports_thinking_effort and prompt.options.thinking_effort
+        )
         if self.supports_thinking and (
             prompt.options.thinking
             or prompt.options.thinking_budget
-            or prompt.options.thinking_effort
+            or thinking_effort_enabled
         ):
             prompt.options.thinking = True
-            if prompt.options.thinking_effort:
+            if thinking_effort_enabled:
                 kwargs["output_config"] = {
                     "effort": prompt.options.thinking_effort.value
                 }
