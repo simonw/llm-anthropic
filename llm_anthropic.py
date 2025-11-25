@@ -1,4 +1,5 @@
 from anthropic import Anthropic, AsyncAnthropic, transform_schema
+import enum
 import llm
 import json
 from typing import Optional, List
@@ -7,6 +8,13 @@ from json_schema_to_pydantic import create_model as json_schema_to_model
 
 DEFAULT_THINKING_TOKENS = 1024
 DEFAULT_TEMPERATURE = 1.0
+
+
+# Thinking effort enum, string, low, medium or high
+class ThinkingEffort(str, enum.Enum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
 
 
 @llm.hookimpl
@@ -199,6 +207,26 @@ def register_models(register):
         ),
         aliases=("claude-haiku-4.5",),
     )
+    # claude-opus-4-5
+    register(
+        ClaudeMessages(
+            "claude-opus-4-5-20251101",
+            supports_pdf=True,
+            supports_thinking=True,
+            supports_thinking_effort=True,
+            supports_web_search=True,
+            default_max_tokens=8192,
+        ),
+        AsyncClaudeMessages(
+            "claude-opus-4-5-20251101",
+            supports_pdf=True,
+            supports_thinking=True,
+            supports_thinking_effort=True,
+            supports_web_search=True,
+            default_max_tokens=8192,
+        ),
+        aliases=("claude-opus-4.5",),
+    )
 
 
 class ClaudeOptions(llm.Options):
@@ -371,6 +399,13 @@ class ClaudeOptionsWithThinking(ClaudeOptions):
     )
 
 
+class ClaudeOptionsWithThinkingEffort(ClaudeOptionsWithThinking):
+    thinking_effort: ThinkingEffort | None = Field(
+        description="Level of thinking effort to apply: low, medium, or high",
+        default=None,
+    )
+
+
 def source_for_attachment(attachment):
     if attachment.url:
         return {
@@ -392,6 +427,7 @@ class _Shared:
     base_url = None
 
     supports_thinking = False
+    supports_thinking_effort = False
     supports_schema = True
     supports_tools = True
     supports_web_search = False
@@ -406,6 +442,7 @@ class _Shared:
         supports_images=True,
         supports_pdf=False,
         supports_thinking=False,
+        supports_thinking_effort=False,
         supports_web_search=False,
         use_structured_outputs=False,
         default_max_tokens=None,
@@ -430,6 +467,9 @@ class _Shared:
         if supports_thinking:
             self.supports_thinking = True
             self.Options = ClaudeOptionsWithThinking
+        if supports_thinking_effort:
+            self.supports_thinking_effort = True
+            self.Options = ClaudeOptionsWithThinkingEffort
         if default_max_tokens is not None:
             self.default_max_tokens = default_max_tokens
         self.supports_web_search = supports_web_search
@@ -620,11 +660,20 @@ class _Shared:
             kwargs["stop_sequences"] = prompt.options.stop_sequences
 
         if self.supports_thinking and (
-            prompt.options.thinking or prompt.options.thinking_budget
+            prompt.options.thinking
+            or prompt.options.thinking_budget
+            or prompt.options.thinking_effort
         ):
             prompt.options.thinking = True
-            budget_tokens = prompt.options.thinking_budget or DEFAULT_THINKING_TOKENS
-            kwargs["thinking"] = {"type": "enabled", "budget_tokens": budget_tokens}
+            if prompt.options.thinking_effort:
+                kwargs["output_config"] = {
+                    "effort": prompt.options.thinking_effort.value
+                }
+            else:
+                budget_tokens = (
+                    prompt.options.thinking_budget or DEFAULT_THINKING_TOKENS
+                )
+                kwargs["thinking"] = {"type": "enabled", "budget_tokens": budget_tokens}
 
         max_tokens = self.default_max_tokens
         if prompt.options.max_tokens is not None:
@@ -639,6 +688,8 @@ class _Shared:
 
         # Determine which beta headers to use
         betas = []
+        if "output_config" in kwargs:
+            betas.append("effort-2025-11-24")
         if max_tokens > 64000:
             betas.append("output-128k-2025-02-19")
             if "thinking" in kwargs:
