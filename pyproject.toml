@@ -22,8 +22,11 @@ CI = "https://github.com/simonw/llm-anthropic/actions"
 [project.entry-points.llm]
 anthropic = "llm_anthropic"
 
-[project.optional-dependencies]
-test = ["pytest", "pytest-recording", "pytest-asyncio", "cogapp"]
+[dependency-groups]
+dev = ["pytest", "pytest-recording", "pytest-asyncio", "cogapp"]
+
+[tool.uv]
+package = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "strict"
