@@ -276,16 +276,15 @@ To run the tests:
 pytest
 ```
 
-Alternatively, if you have [uv](https://github.com/astral-sh/uv) and [just](https://github.com/casey/just) installed you can run tests without creating a virtual environment like this:
+Alternatively, if you have [uv](https://github.com/astral-sh/uv) you can run tests without first creating a virtual environment like this:
 ```bash
-just        # runs tests (default task)
-just test   # runs tests
-just test -k test_name  # pass arguments to pytest
+uv run pytest
+uv run pytest -k test_tools
 ```
 
 You can also run the `llm` command in a `uv` managed environment like this:
 ```bash
-just llm 'your prompt here'
+uv run llm 'your prompt here'
 ```
 To enable debug logs while running ([like this](https://github.com/simonw/llm-anthropic/issues/54#issuecomment-3536842831)), set this environment variable:
 ```bash
@@ -308,8 +307,8 @@ I use the following sequence:
 # First delete the relevant cassette if it exists already:
 rm tests/cassettes/test_anthropic/test_thinking_prompt.yaml
 # Run this failing test to recreate the cassette
-PYTEST_ANTHROPIC_API_KEY="$(llm keys get claude)" just test -k test_thinking_prompt --record-mode once
+PYTEST_ANTHROPIC_API_KEY="$(llm keys get claude)" uv run pytest -k test_thinking_prompt --record-mode once
 # Now run the test again with --pdb to figure out how to update it
-just test -k test_thinking_prompt --pdb
+uv run pytest -k test_thinking_prompt --pdb
 # Edit test
 ```
