@@ -269,7 +269,7 @@ source venv/bin/activate
 ```
 Now install the dependencies and test dependencies:
 ```bash
-llm install -e '.[test]'
+pip install -e . --group dev
 ```
 To run the tests:
 ```bash

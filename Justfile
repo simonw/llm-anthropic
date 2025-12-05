@@ -1,7 +1,7 @@
 set positional-arguments
 
 test *args:
-    uv run --isolated --with-editable '.[test]' pytest "$@"
+    uv run pytest "$@"
 
 llm *args:
-    uv run --isolated --with-editable '.[test]' llm "$@"
+    uv run llm "$@"
