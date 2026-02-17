@@ -281,3 +281,80 @@ def test_web_search():
     response_dict = dict(response.response_json)
     assert "content" in response_dict
     assert len(response_dict["content"]) > 0
+
+
+@pytest.mark.vcr
+def test_opus_46_prompt():
+    model = llm.get_model("claude-opus-4.6")
+    model.key = model.key or ANTHROPIC_API_KEY
+    response = model.prompt("Two names for a pet pelican, be brief")
+    text = response.text()
+    assert len(text) > 0
+    response_dict = dict(response.response_json)
+    assert response_dict["model"] == "claude-opus-4-6"
+    assert response.input_tokens > 0
+    assert response.output_tokens > 0
+
+
+@pytest.mark.vcr
+def test_sonnet_46_prompt():
+    model = llm.get_model("claude-sonnet-4.6")
+    model.key = model.key or ANTHROPIC_API_KEY
+    response = model.prompt("Two names for a pet pelican, be brief")
+    text = response.text()
+    assert len(text) > 0
+    response_dict = dict(response.response_json)
+    assert response_dict["model"] == "claude-sonnet-4-6"
+    assert response.input_tokens > 0
+    assert response.output_tokens > 0
+
+
+@pytest.mark.vcr
+def test_opus_46_adaptive_thinking():
+    model = llm.get_model("claude-opus-4.6")
+    model.key = model.key or ANTHROPIC_API_KEY
+    response = model.prompt(
+        "Two names for a pet pelican, be brief", thinking=True
+    )
+    text = response.text()
+    assert len(text) > 0
+    response_dict = dict(response.response_json)
+    # Should have thinking content in the response
+    content_types = [block["type"] for block in response_dict["content"]]
+    assert "thinking" in content_types
+    assert "text" in content_types
+
+
+@pytest.mark.vcr
+def test_sonnet_46_effort_without_thinking():
+    model = llm.get_model("claude-sonnet-4.6")
+    model.key = model.key or ANTHROPIC_API_KEY
+    response = model.prompt(
+        "Two names for a pet pelican, be brief", thinking_effort="low"
+    )
+    text = response.text()
+    assert len(text) > 0
+
+
+def test_46_prefill_rejected():
+    model = llm.get_model("claude-opus-4.6")
+    model.key = "test-key"
+    with pytest.raises(ValueError, match="Prefilling assistant messages is not supported"):
+        model.prompt("Hello", prefill="{").text()
+
+
+def test_46_max_effort_opus_only():
+    model = llm.get_model("claude-sonnet-4.6")
+    model.key = "test-key"
+    with pytest.raises(ValueError, match="thinking_effort='max' is only supported"):
+        model.prompt("Hello", thinking_effort="max").text()
+
+
+@pytest.mark.vcr
+def test_opus_46_schema():
+    model = llm.get_model("claude-opus-4.6")
+    response = model.prompt("Invent a good dog", schema=Dog, key=ANTHROPIC_API_KEY)
+    dog = json.loads(response.text())
+    assert "name" in dog
+    assert "age" in dog
+    assert "bio" in dog

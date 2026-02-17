@@ -15,6 +15,7 @@ class ThinkingEffort(str, enum.Enum):
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
+    MAX = "max"
 
 
 @llm.hookimpl
@@ -227,6 +228,54 @@ def register_models(register):
         ),
         aliases=("claude-opus-4.5",),
     )
+    # claude-opus-4-6
+    register(
+        ClaudeMessages(
+            "claude-opus-4-6",
+            supports_pdf=True,
+            supports_thinking=True,
+            supports_thinking_effort=True,
+            supports_adaptive_thinking=True,
+            supports_web_search=True,
+            use_structured_outputs=True,
+            default_max_tokens=8192,
+        ),
+        AsyncClaudeMessages(
+            "claude-opus-4-6",
+            supports_pdf=True,
+            supports_thinking=True,
+            supports_thinking_effort=True,
+            supports_adaptive_thinking=True,
+            supports_web_search=True,
+            use_structured_outputs=True,
+            default_max_tokens=8192,
+        ),
+        aliases=("claude-opus-4.6",),
+    )
+    # claude-sonnet-4-6
+    register(
+        ClaudeMessages(
+            "claude-sonnet-4-6",
+            supports_pdf=True,
+            supports_thinking=True,
+            supports_thinking_effort=True,
+            supports_adaptive_thinking=True,
+            supports_web_search=True,
+            use_structured_outputs=True,
+            default_max_tokens=8192,
+        ),
+        AsyncClaudeMessages(
+            "claude-sonnet-4-6",
+            supports_pdf=True,
+            supports_thinking=True,
+            supports_thinking_effort=True,
+            supports_adaptive_thinking=True,
+            supports_web_search=True,
+            use_structured_outputs=True,
+            default_max_tokens=8192,
+        ),
+        aliases=("claude-sonnet-4.6",),
+    )
 
 
 class ClaudeOptions(llm.Options):
@@ -428,6 +477,7 @@ class _Shared:
 
     supports_thinking = False
     supports_thinking_effort = False
+    supports_adaptive_thinking = False
     supports_schema = True
     supports_tools = True
     supports_web_search = False
@@ -443,6 +493,7 @@ class _Shared:
         supports_pdf=False,
         supports_thinking=False,
         supports_thinking_effort=False,
+        supports_adaptive_thinking=False,
         supports_web_search=False,
         use_structured_outputs=False,
         default_max_tokens=None,
@@ -470,6 +521,8 @@ class _Shared:
         if supports_thinking_effort:
             self.supports_thinking_effort = True
             self.Options = ClaudeOptionsWithThinkingEffort
+        if supports_adaptive_thinking:
+            self.supports_adaptive_thinking = True
         if default_max_tokens is not None:
             self.default_max_tokens = default_max_tokens
         self.supports_web_search = supports_web_search
@@ -615,6 +668,11 @@ class _Shared:
 
         # Add prefill if specified
         if prompt.options.prefill:
+            if self.supports_adaptive_thinking:
+                raise ValueError(
+                    f"Prefilling assistant messages is not supported by {self.claude_model_id}. "
+                    f"Use structured outputs or system prompt instructions instead."
+                )
             prefill_content = [{"type": "text", "text": prompt.options.prefill}]
             messages.append({"role": "assistant", "content": prefill_content})
 
@@ -631,7 +689,8 @@ class _Shared:
             raise ValueError(
                 f"Web search is not supported by model {self.model_id}. "
                 f"Supported models include: claude-3.5-sonnet-latest, claude-3.5-haiku-latest, "
-                f"claude-3.7-sonnet-latest, claude-4-opus, claude-4-sonnet, claude-opus-4.1"
+                f"claude-3.7-sonnet-latest, claude-4-opus, claude-4-sonnet, claude-opus-4.1, "
+                f"claude-opus-4.6, claude-sonnet-4.6"
             )
 
         kwargs = {
@@ -662,21 +721,47 @@ class _Shared:
         thinking_effort_enabled = (
             self.supports_thinking_effort and prompt.options.thinking_effort
         )
-        if self.supports_thinking and (
-            prompt.options.thinking
-            or prompt.options.thinking_budget
-            or thinking_effort_enabled
-        ):
+
+        # Determine if thinking should be activated
+        thinking_requested = False
+        if self.supports_thinking:
+            thinking_requested = prompt.options.thinking or prompt.options.thinking_budget
+            # On pre-GA effort models (Opus 4.5), effort implies thinking
+            if thinking_effort_enabled and not self.supports_adaptive_thinking:
+                thinking_requested = True
+
+        if self.supports_thinking and thinking_requested:
             prompt.options.thinking = True
-            if thinking_effort_enabled:
-                kwargs["output_config"] = {
-                    "effort": prompt.options.thinking_effort.value
+            if prompt.options.thinking_budget:
+                # Explicit budget = manual mode (deprecated on 4.6 but still works)
+                kwargs["thinking"] = {
+                    "type": "enabled",
+                    "budget_tokens": prompt.options.thinking_budget,
                 }
+            elif self.supports_adaptive_thinking:
+                # 4.6 models default to adaptive thinking
+                kwargs["thinking"] = {"type": "adaptive"}
             else:
-                budget_tokens = (
-                    prompt.options.thinking_budget or DEFAULT_THINKING_TOKENS
-                )
-                kwargs["thinking"] = {"type": "enabled", "budget_tokens": budget_tokens}
+                # Pre-4.6 models: enabled with default budget
+                budget_tokens = DEFAULT_THINKING_TOKENS
+                kwargs["thinking"] = {
+                    "type": "enabled",
+                    "budget_tokens": budget_tokens,
+                }
+
+        # Handle effort in output_config
+        if thinking_effort_enabled:
+            if prompt.options.thinking_effort == ThinkingEffort.MAX:
+                if not (
+                    self.supports_adaptive_thinking
+                    and "opus" in self.claude_model_id
+                ):
+                    raise ValueError(
+                        "thinking_effort='max' is only supported by claude-opus-4-6"
+                    )
+            kwargs.setdefault("output_config", {})["effort"] = (
+                prompt.options.thinking_effort.value
+            )
 
         max_tokens = self.default_max_tokens
         if prompt.options.max_tokens is not None:
@@ -691,9 +776,17 @@ class _Shared:
 
         # Determine which beta headers to use
         betas = []
-        if "output_config" in kwargs:
+
+        # Effort beta: only for pre-GA models (e.g., Opus 4.5)
+        if (
+            "output_config" in kwargs
+            and "effort" in kwargs.get("output_config", {})
+            and not self.supports_adaptive_thinking
+        ):
             betas.append("effort-2025-11-24")
-        if max_tokens > 64000:
+
+        # 128K output beta: not needed for 4.6 models
+        if max_tokens > 64000 and not self.supports_adaptive_thinking:
             betas.append("output-128k-2025-02-19")
             if "thinking" in kwargs:
                 kwargs["extra_body"] = {"thinking": kwargs.pop("thinking")}
@@ -702,13 +795,19 @@ class _Shared:
         use_structured_outputs = prompt.schema and self.use_structured_outputs
 
         if use_structured_outputs:
-            # Use new structured outputs mechanism
-            betas.append("structured-outputs-2025-11-13")
-            # Transform schema to ensure it meets structured output requirements
-            kwargs["output_format"] = {
-                "type": "json_schema",
-                "schema": transform_schema(prompt.schema),
-            }
+            if self.supports_adaptive_thinking:
+                # 4.6: output_config.format, no beta header
+                kwargs.setdefault("output_config", {})["format"] = {
+                    "type": "json_schema",
+                    "schema": transform_schema(prompt.schema),
+                }
+            else:
+                # Pre-4.6: output_format with beta header
+                betas.append("structured-outputs-2025-11-13")
+                kwargs["output_format"] = {
+                    "type": "json_schema",
+                    "schema": transform_schema(prompt.schema),
+                }
 
         if betas:
             kwargs["betas"] = betas
@@ -808,9 +907,10 @@ class ClaudeMessages(_Shared, llm.KeyModel):
         else:
             messages_client = client.messages
 
-        # For structured outputs, convert JSON schema to Pydantic model for stream()
+        # For structured outputs with output_format (pre-4.6), convert JSON schema
+        # to Pydantic model for beta stream(). output_config.format (4.6) uses raw
+        # JSON schema dict directly.
         if "output_format" in kwargs and stream:
-            # Extract the schema and convert to Pydantic model
             schema = kwargs["output_format"]["schema"]
             pydantic_model = json_schema_to_model(schema)
             kwargs["output_format"] = pydantic_model
@@ -856,9 +956,10 @@ class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
             messages_client = client.messages
         prefill_text = self.prefill_text(prompt)
 
-        # For structured outputs, convert JSON schema to Pydantic model for stream()
+        # For structured outputs with output_format (pre-4.6), convert JSON schema
+        # to Pydantic model for beta stream(). output_config.format (4.6) uses raw
+        # JSON schema dict directly.
         if "output_format" in kwargs and stream:
-            # Extract the schema and convert to Pydantic model
             schema = kwargs["output_format"]["schema"]
             pydantic_model = json_schema_to_model(schema)
             kwargs["output_format"] = pydantic_model
