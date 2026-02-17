@@ -26,7 +26,8 @@ def test_prompt():
     response_dict = dict(response.response_json)
     response_dict.pop("id")  # differs between requests
     assert response_dict == {
-        "content": [{"citations": None, "text": "- Captain\n- Scoop", "type": "text"}],
+        "container": None,
+        "content": [{"citations": None, "parsed_output": None, "text": "- Captain\n- Scoop", "type": "text"}],
         "model": "claude-sonnet-4-5-20250929",
         "role": "assistant",
         "stop_reason": "end_turn",
@@ -49,7 +50,8 @@ async def test_async_prompt():
     response_dict = dict(response.response_json)
     response_dict.pop("id")  # differs between requests
     assert response_dict == {
-        "content": [{"citations": None, "text": "- Captain\n- Scoop", "type": "text"}],
+        "container": None,
+        "content": [{"citations": None, "parsed_output": None, "text": "- Captain\n- Scoop", "type": "text"}],
         "model": "claude-sonnet-4-5-20250929",
         "role": "assistant",
         "stop_reason": "end_turn",
@@ -60,7 +62,7 @@ async def test_async_prompt():
     assert response.output_tokens == 10
     assert response.token_details is None
     response2 = await conversation.prompt("in french")
-    assert await response2.text() == '- Capitaine\n- Bec (meaning "beak")'
+    assert await response2.text() == "- Capitaine\n- Bec (beak)"
 
 
 EXPECTED_IMAGE_TEXT = "Red square, green square."
@@ -78,7 +80,8 @@ def test_image_prompt():
     response_dict = response.response_json
     response_dict.pop("id")  # differs between requests
     assert response_dict == {
-        "content": [{"citations": None, "text": EXPECTED_IMAGE_TEXT, "type": "text"}],
+        "container": None,
+        "content": [{"citations": None, "parsed_output": None, "text": EXPECTED_IMAGE_TEXT, "type": "text"}],
         "model": "claude-sonnet-4-5-20250929",
         "role": "assistant",
         "stop_reason": "end_turn",
@@ -175,17 +178,18 @@ async def test_schema_prompt_async():
     dog_json = await response.text()
     dog = json.loads(dog_json)
     assert dog == {
-        "age": 3,
+        "age": 4,
         "bio": (
-            "Biscuit is a golden retriever with a heart of pure sunshine. This "
-            "enthusiastic pup has mastered over 50 tricks, volunteers at the local "
-            "children's hospital bringing smiles to young patients, and has an uncanny "
-            "ability to sense when someone needs comfort. With her flowing golden "
-            "coat, perpetually wagging tail, and gentle brown eyes, Biscuit embodies "
-            "loyalty and joy. She loves swimming in lakes, playing fetch until sunset, "
-            "and curling up for story time with her family."
+            "Nebula is a spirited Australian Shepherd mix with striking blue-merle "
+            "coat and one bright amber eye, one pale blue. She's a certified therapy "
+            "dog who visits children's hospitals weekly, has an uncanny ability to "
+            "sense when someone needs comfort, and loves solving puzzle toys. Her "
+            "favorite activities include agility courses, swimming in lakes, and "
+            "gentle play with her best friend\u2014a rescue cat named Comet. Nebula "
+            "once alerted her family to a gas leak, saving their lives, and she's "
+            "currently training to be a search and rescue dog."
         ),
-        "name": "Biscuit",
+        "name": "Nebula",
     }
 
 
@@ -214,19 +218,20 @@ def test_thinking_prompt():
     response = conversation.prompt(
         "Two names for a pet pelican, be brief", thinking=True, key=ANTHROPIC_API_KEY
     )
-    assert response.text() == "Bill\nScoop"
+    assert response.text() == "- Captain\n- Scoop"
     response_dict = dict(response.response_json)
     response_dict.pop("id")  # differs between requests
     assert response_dict == {
+        "container": None,
         "content": [
             {
-                "signature": "ErUBCkYICRgCIkCUCsMUICiFm+sgvS255wUaTjAJEX2tc5h+Mir6Kq6OozIF+9a3ygFFnCLjPYf2Jl18eMVqkYVs0Vq9rRJpl6N/EgySPIWO4SVcxV0VqecaDM6REdwo/8lOJenaQCIwzQfkXeoR1nwYqsvrQsf4/NwhTuKfWDtM8a0XHfoH7EFwizaRuTrwV21Ny1nWKbu2Kh2qjLQOYn34/0pMKErgEexGTvXvn5PMMSAqOVqz8BgC",
-                "thinking": "I need to provide two brief names for a pet pelican. Pelicans are large water birds with distinctive pouched bills, so I could create names that relate to:\n- Their appearance (bill, pouch)\n- Water/ocean themes\n- Their fishing abilities\n- Classic pet names with a twist\n\nI'll provide two short, creative names without additional commentary, as the request asks me to be brief.",
+                "signature": "EvoCCkYICxgCKkCY593DZILKPT3+cK6Py3Hcu8WYGSW2vk6yge13JAuAYlQFzUC2c6UlsIWiBMvJjtDc6zfh73EOpWqxYB+pOh5zEgxoquY58aQkL5YJ9YUaDJpBRqMUVxU6SPYLRCIwcxSHXlhIWQw0QhiPV+lrMXgTdk4SuJnWVpHc+uTSxYmxetnHugsdCo6xWShRJaQLKuEBsfQzKHid0WmA8hdgz0mVpI+nAPvnhpHFIZbnGl2HQi7cc87o/HZzCod2tF8mEuqdyNtPHgx+H+Zyr/Pi0kmJF6hOoylmR5nGrXeqR1ttWFzzPF7XpmIr+vw3y/rNCDQVRWxmG/IDyHVLKXtALaFnDpNfvSGv6L3udrgkeWuV2VEzfGPclEIaailiMsxesYC/LJGUcPlqZ9kL18GQ16lr15u6kOUMlyYKA7AoeL6K7U3qCvpSdfGpMfgkasK5ugj0FL3UgFpUrrFbPlpLAdLsNeG2G+XBiOY0TtfokCiI1P7LGAE=",
+                "thinking": "The user wants two names for a pet pelican, and wants me to be brief. I'll give two simple, fitting names.\n\nSome options:\n- Pete\n- Percy\n- Captain\n- Scoop\n- Bill\n- Gully\n\nI'll pick two good ones and keep it very short.",
                 "type": "thinking",
             },
-            {"citations": None, "text": "Bill\nScoop", "type": "text"},
+            {"citations": None, "parsed_output": None, "text": "- Captain\n- Scoop", "type": "text"},
         ],
-        "model": "claude-3-7-sonnet-20250219",
+        "model": "claude-sonnet-4-5-20250929",
         "role": "assistant",
         "stop_reason": "end_turn",
         "stop_sequence": None,
@@ -234,7 +239,7 @@ def test_thinking_prompt():
     }
 
     assert response.input_tokens == 46
-    assert response.output_tokens == 103
+    assert response.output_tokens == 84
     assert response.token_details is None
 
 
@@ -281,3 +286,80 @@ def test_web_search():
     response_dict = dict(response.response_json)
     assert "content" in response_dict
     assert len(response_dict["content"]) > 0
+
+
+@pytest.mark.vcr
+def test_opus_46_prompt():
+    model = llm.get_model("claude-opus-4.6")
+    model.key = model.key or ANTHROPIC_API_KEY
+    response = model.prompt("Two names for a pet pelican, be brief")
+    text = response.text()
+    assert len(text) > 0
+    response_dict = dict(response.response_json)
+    assert response_dict["model"] == "claude-opus-4-6"
+    assert response.input_tokens > 0
+    assert response.output_tokens > 0
+
+
+@pytest.mark.vcr
+def test_sonnet_46_prompt():
+    model = llm.get_model("claude-sonnet-4.6")
+    model.key = model.key or ANTHROPIC_API_KEY
+    response = model.prompt("Two names for a pet pelican, be brief")
+    text = response.text()
+    assert len(text) > 0
+    response_dict = dict(response.response_json)
+    assert response_dict["model"] == "claude-sonnet-4-6"
+    assert response.input_tokens > 0
+    assert response.output_tokens > 0
+
+
+@pytest.mark.vcr
+def test_opus_46_adaptive_thinking():
+    model = llm.get_model("claude-opus-4.6")
+    model.key = model.key or ANTHROPIC_API_KEY
+    response = model.prompt(
+        "Two names for a pet pelican, be brief", thinking=True
+    )
+    text = response.text()
+    assert len(text) > 0
+    response_dict = dict(response.response_json)
+    # Should have thinking content in the response
+    content_types = [block["type"] for block in response_dict["content"]]
+    assert "thinking" in content_types
+    assert "text" in content_types
+
+
+@pytest.mark.vcr
+def test_sonnet_46_effort_without_thinking():
+    model = llm.get_model("claude-sonnet-4.6")
+    model.key = model.key or ANTHROPIC_API_KEY
+    response = model.prompt(
+        "Two names for a pet pelican, be brief", thinking_effort="low"
+    )
+    text = response.text()
+    assert len(text) > 0
+
+
+def test_46_prefill_rejected():
+    model = llm.get_model("claude-opus-4.6")
+    model.key = "test-key"
+    with pytest.raises(ValueError, match="Prefilling assistant messages is not supported"):
+        model.prompt("Hello", prefill="{").text()
+
+
+def test_46_max_effort_opus_only():
+    model = llm.get_model("claude-sonnet-4.6")
+    model.key = "test-key"
+    with pytest.raises(ValueError, match="thinking_effort='max' is only supported"):
+        model.prompt("Hello", thinking_effort="max").text()
+
+
+@pytest.mark.vcr
+def test_opus_46_schema():
+    model = llm.get_model("claude-opus-4.6")
+    response = model.prompt("Invent a good dog", schema=Dog, key=ANTHROPIC_API_KEY)
+    dog = json.loads(response.text())
+    assert "name" in dog
+    assert "age" in dog
+    assert "bio" in dog
