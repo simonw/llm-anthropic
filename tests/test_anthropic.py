@@ -431,3 +431,42 @@ def test_stream_events_tool_calls():
     assert len(name_events) >= 1, "Should have tool_call_name event"
     assert name_events[0].chunk == "pelican_name_generator"
     assert name_events[0].tool_call_id is not None
+
+
+@pytest.mark.vcr
+def test_web_search_tool_result_ordering():
+    """web_search_tool_result parts appear BEFORE the text that uses them."""
+    model = llm.get_model("claude-opus-4.1")
+    model.key = model.key or ANTHROPIC_API_KEY
+    response = model.prompt(
+        "What is the current weather in San Francisco?", web_search=True
+    )
+    events = list(response.stream_events())
+
+    # Find indices of first tool_result and first text event
+    tool_result_indices = [
+        i for i, e in enumerate(events) if e.type == "tool_result"
+    ]
+    text_indices = [
+        i for i, e in enumerate(events)
+        if e.type == "text" and e.chunk.strip()  # non-empty text
+    ]
+    assert len(tool_result_indices) >= 1, "Should have tool_result events"
+    assert len(text_indices) >= 1, "Should have text events"
+
+    # The tool_result should come before the main text content
+    first_tool_result = tool_result_indices[0]
+    first_substantive_text = text_indices[0]
+    assert first_tool_result < first_substantive_text, (
+        f"tool_result at index {first_tool_result} should come before "
+        f"text at index {first_substantive_text}"
+    )
+
+    # Also verify via parts
+    parts = response.parts
+    part_types = [type(p).__name__ for p in parts]
+    # ToolResultPart should appear before the main TextParts
+    if "ToolResultPart" in part_types and "TextPart" in part_types:
+        first_result_idx = part_types.index("ToolResultPart")
+        first_text_idx = part_types.index("TextPart")
+        assert first_result_idx < first_text_idx

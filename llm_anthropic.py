@@ -934,8 +934,24 @@ class ClaudeMessages(_Shared, llm.KeyModel):
                                 server_executed=(block_type == "server_tool_use"),
                             )
                         elif block_type == "web_search_tool_result":
-                            # Server-side tool result
-                            pass  # Content comes in the final message
+                            # Content is available inline on content_block_start
+                            tool_use_id = getattr(block, "tool_use_id", None)
+                            result_content = getattr(block, "content", [])
+                            if result_content:
+                                result_text = json.dumps(
+                                    [b if isinstance(b, dict) else b.model_dump()
+                                     for b in result_content]
+                                )
+                            else:
+                                result_text = ""
+                            yield StreamEvent(
+                                type="tool_result",
+                                chunk=result_text,
+                                part_index=part_index,
+                                tool_call_id=tool_use_id,
+                                server_executed=True,
+                                tool_name="web_search",
+                            )
 
                     elif chunk.type == "content_block_delta":
                         delta = chunk.delta
@@ -967,21 +983,6 @@ class ClaudeMessages(_Shared, llm.KeyModel):
                     stream_obj.get_final_message()
                 )
                 response.response_json = last_message
-
-                # Extract server-side tool results from final message
-                for content_block in last_message.get("content", []):
-                    if content_block.get("type") == "web_search_tool_result":
-                        part_index += 1
-                        result_content = content_block.get("content", [])
-                        result_text = json.dumps(result_content) if result_content else ""
-                        yield StreamEvent(
-                            type="tool_result",
-                            chunk=result_text,
-                            part_index=part_index,
-                            tool_call_id=content_block.get("tool_use_id"),
-                            server_executed=True,
-                            tool_name="web_search",
-                        )
 
                 if self.add_tool_usage(response, last_message):
                     # Avoid "can have dragons.Now that I " bug
@@ -1087,6 +1088,24 @@ class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
                                 tool_call_id=current_block_id,
                                 server_executed=(block_type == "server_tool_use"),
                             )
+                        elif block_type == "web_search_tool_result":
+                            tool_use_id = getattr(block, "tool_use_id", None)
+                            result_content = getattr(block, "content", [])
+                            if result_content:
+                                result_text = json.dumps(
+                                    [b if isinstance(b, dict) else b.model_dump()
+                                     for b in result_content]
+                                )
+                            else:
+                                result_text = ""
+                            yield StreamEvent(
+                                type="tool_result",
+                                chunk=result_text,
+                                part_index=part_index,
+                                tool_call_id=tool_use_id,
+                                server_executed=True,
+                                tool_name="web_search",
+                            )
 
                     elif chunk.type == "content_block_delta":
                         delta = chunk.delta
@@ -1116,21 +1135,6 @@ class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
             response.response_json = self._model_dump_suppress_warnings(
                 await stream_obj.get_final_message()
             )
-
-            # Extract server-side tool results from final message
-            for content_block in response.response_json.get("content", []):
-                if content_block.get("type") == "web_search_tool_result":
-                    part_index += 1
-                    result_content = content_block.get("content", [])
-                    result_text = json.dumps(result_content) if result_content else ""
-                    yield StreamEvent(
-                        type="tool_result",
-                        chunk=result_text,
-                        part_index=part_index,
-                        tool_call_id=content_block.get("tool_use_id"),
-                        server_executed=True,
-                        tool_name="web_search",
-                    )
 
             self.add_tool_usage(response, response.response_json)
         else:
