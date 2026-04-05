@@ -10,7 +10,6 @@ classifiers = []
 dependencies = [
     "llm>=0.26",
     "anthropic>=0.80",
-    "json-schema-to-pydantic",
 ]
 
 [project.urls]

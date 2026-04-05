@@ -1,308 +1,83 @@
 interactions:
 - request:
     body: '{"max_tokens":8192,"messages":[{"role":"user","content":[{"type":"text","text":"Invent
-      a good dog"}]}],"model":"claude-sonnet-4-5","output_format":{"schema":{"type":"object","title":"Dog","properties":{"name":{"type":"string","title":"Name"},"age":{"type":"integer","title":"Age"},"bio":{"type":"string","title":"Bio"}},"additionalProperties":false,"required":["name","age","bio"]},"type":"json_schema"},"temperature":1.0,"stream":true}'
+      a good dog"}]}],"model":"claude-sonnet-4-5","output_config":{"format":{"type":"json_schema","schema":{"type":"object","title":"Dog","properties":{"name":{"type":"string","title":"Name"},"age":{"type":"integer","title":"Age"},"bio":{"type":"string","title":"Bio"}},"additionalProperties":false,"required":["name","age","bio"]}}},"temperature":1.0,"stream":true}'
     headers:
-      accept:
+      Accept:
       - application/json
-      accept-encoding:
+      Accept-Encoding:
       - gzip, deflate
-      anthropic-beta:
-      - structured-outputs-2025-11-13
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '447'
+      Content-Type:
+      - application/json
+      Host:
+      - api.anthropic.com
+      User-Agent:
+      - Anthropic/Python 0.89.0
+      X-Stainless-Arch:
+      - arm64
+      X-Stainless-Async:
+      - 'false'
+      X-Stainless-Helper-Method:
+      - stream
+      X-Stainless-Lang:
+      - python
+      X-Stainless-OS:
+      - MacOS
+      X-Stainless-Package-Version:
+      - 0.89.0
+      X-Stainless-Runtime:
+      - CPython
+      X-Stainless-Runtime-Version:
+      - 3.14.3
+      X-Stainless-Stream-Helper:
+      - messages
       anthropic-version:
       - '2023-06-01'
-      connection:
-      - keep-alive
-      content-length:
-      - '436'
-      content-type:
-      - application/json
-      host:
-      - api.anthropic.com
-      user-agent:
-      - Anthropic/Python 0.73.0
-      x-stainless-arch:
-      - arm64
-      x-stainless-async:
-      - 'false'
-      x-stainless-lang:
-      - python
-      x-stainless-os:
-      - MacOS
-      x-stainless-package-version:
-      - 0.73.0
       x-stainless-read-timeout:
       - '600'
       x-stainless-retry-count:
       - '0'
-      x-stainless-runtime:
-      - CPython
-      x-stainless-runtime-version:
-      - 3.10.10
-      x-stainless-stream-helper:
-      - beta.messages
       x-stainless-timeout:
       - NOT_GIVEN
     method: POST
-    uri: https://api.anthropic.com/v1/messages?beta=true
+    uri: https://api.anthropic.com/v1/messages
   response:
     body:
-      string: 'event: message_start
-
-        data: {"type":"message_start","message":{"model":"claude-sonnet-4-5-20250929","id":"msg_01EC9rUWdnDsNne92QpiUGqR","type":"message","role":"assistant","content":[],"stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":230,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":0},"output_tokens":1,"service_tier":"standard"}}
-        }
-
-
-        event: content_block_start
-
-        data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}
-        }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"{\""}              }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"name\":
-        \"B"}      }
-
-
-        event: ping
-
-        data: {"type": "ping"}
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"isc"}
-        }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"uit\",
-        \"age\": 4"}           }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":",
-        \"bio\": \"B"}}
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"iscuit
-        is a loyal"}             }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
-        golden"}               }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
-        retriever with"} }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
-        a gentle"}          }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
-        temperament and boun"}       }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"dless
-        enthusiasm"}              }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
-        for"}              }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
-        life"}    }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":".
-        He loves"}       }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
-        swimming"}            }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
-        in"}     }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
-        lakes"}           }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":","}  }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
-        playing fetch until"} }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
-        sunset"}}
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":",
-        and has"} }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
-        an"}   }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
-        unc"}     }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"anny
-        ability to sense when someone"} }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
-        needs comfort. Known"}        }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
-        in"}          }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
-        his neighborhoo"}}
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"d
-        for"}             }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
-        his friendly demeanor,"}}
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
-        Biscuit volunteers"}     }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
-        at the local children"}         }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"''s
-        hospital bringing"}           }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
-        joy to young"}       }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"
-        patients"}         }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"."}  }
-
-
-        event: content_block_delta
-
-        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"\"}"}     }
-
-
-        event: content_block_stop
-
-        data: {"type":"content_block_stop","index":0       }
-
-
-        event: message_delta
-
-        data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"input_tokens":230,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":96}       }
-
-
-        event: message_stop
-
-        data: {"type":"message_stop"      }
-
-
-        '
+      string: !!binary |
+        H4sIAAAAAAAAA3SQQUvEMBCF7/0VS85baOuu0F4VFERBehQJYzLuBtOkJpOFsvS/OwGrVjG3vO8l
+        b+bhCR11mwFjhAPKSBCo0EDQbc6CphFFJ1ZQbJe76M5i8BotW5SFpLGM3jmkclfuy6Zq9lXbtOw3
+        On8SD7Kqb2/66fpuN7X9qPTl1D+m4f7hij3rKBaCt1mAGA3nupyrvCOeVnRPz1sRyY8yIHCk6Fyy
+        9lOK+J7QKVyJGgmMjYuWlvGNGxNJ8m/oGDYXFYeAOqJU/DMZ7+Ta8cUZ6//Y8jYH4HjEAQNYuR/+
+        +r9pffxN563wiX5KNS+D4WQUSjIYuJxcjIagc8fuFUPeWx7QM3KeJJx4aXjhHud5sz5zUXwAAAD/
+        /0qFxDw0UOOTcvKTs7HHPxYlYBtTUisg3kaWB/kaqq8ktQKkEExZKSnVwmwGAAAA//+C2lyQmZeO
+        ZpWCEkhQCagGAAAA///C6jpgWitJxO86sBIU10FEUF0FVwZ1W3UMzHkoQQQAAAD//7yTuw2AMAxE
+        VzmlRlRMwBxpEhKBpXykOBHrc+lgATr77OKddf4XorgcLW9gzS56DOnWLGwY1alus/ZSPxsQhcNZ
+        U4gFLfYmRG64pV9TJ1GK0DoSGBT4OkpI/DBwcA0Vp3l9+6blBwAA//+809ENgCAQA9BVOo5roFYg
+        0cMAhvDh7laNK7hBX9P+S8ZA+ExWRVLwjp1Zh/4AzXmvPeA+7yMITl7DYZMz63BjXGPtqAlFFyFa
+        UA8lbUxGGDkXSbYlabDn67sAAAD//6Kv//QUPIAxlJZYll+UWZKqkJhcklmWCcy8xQqZeck5wBJT
+        oSAnsRLkxbTUkmSgl0sUSjJSFZJSgQWJjkJeYgEoOwDVKhSXAv0L8wMAAAD//6JzHBUX5JcU64DD
+        v7gkNTEH5KRioHnFoHBPTEkBURlAbxanAku+EqCzcnJSk0EFIDCeUoCpEeKjFL0YpVr0TAb0DAAA
+        AP//wlEM5RcQKoXyC5C8AjQIAAAA//9KRa3JsIYHiqQSkv9RahOl1LyU+JLSojwlouuUWtpVKmi1
+        gKVJLXLwAQAAAP//SkWvvzEDDllOCaILAAAA//8DAIJoTIv2BwAA
     headers:
       CF-RAY:
-      - 99eaf38458c549fc-SJC
+      - 9e77ed939f83ed40-SJC
       Cache-Control:
       - no-cache
       Connection:
       - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Security-Policy:
+      - default-src 'none'; frame-ancestors 'none'
       Content-Type:
       - text/event-stream; charset=utf-8
       Date:
-      - Sat, 15 Nov 2025 01:24:54 GMT
+      - Sun, 05 Apr 2026 10:39:20 GMT
       Server:
       - cloudflare
       Transfer-Encoding:
@@ -316,29 +91,40 @@ interactions:
       anthropic-ratelimit-input-tokens-remaining:
       - '2000000'
       anthropic-ratelimit-input-tokens-reset:
-      - '2025-11-15T01:24:50Z'
+      - '2026-04-05T10:39:17Z'
       anthropic-ratelimit-output-tokens-limit:
       - '400000'
       anthropic-ratelimit-output-tokens-remaining:
       - '400000'
       anthropic-ratelimit-output-tokens-reset:
-      - '2025-11-15T01:24:50Z'
+      - '2026-04-05T10:39:17Z'
+      anthropic-ratelimit-requests-limit:
+      - '20000'
+      anthropic-ratelimit-requests-remaining:
+      - '19999'
+      anthropic-ratelimit-requests-reset:
+      - '2026-04-05T10:39:17Z'
       anthropic-ratelimit-tokens-limit:
       - '2400000'
       anthropic-ratelimit-tokens-remaining:
       - '2400000'
       anthropic-ratelimit-tokens-reset:
-      - '2025-11-15T01:24:50Z'
+      - '2026-04-05T10:39:17Z'
       cf-cache-status:
       - DYNAMIC
       request-id:
-      - req_011CV8oWKLvhXUDMFqY1Siz4
-      retry-after:
-      - '10'
+      - req_011CZkUqhE8yGry9H4DHPno4
+      server-timing:
+      - x-originResponse;dur=3196
+      set-cookie:
+      - _cfuvid=EVY1l_CL2rjnA.dTAbTKoxRlIVoX0YUOGlSsft8xcXs-1775385557.0563052-1.0.1.1-X0vBH6QBy7g2dV6Inf4Yo9rd6yFwYXeqO5KzYRxC5qo;
+        HttpOnly; SameSite=None; Secure; Path=/; Domain=api.anthropic.com
       strict-transport-security:
       - max-age=31536000; includeSubDomains; preload
+      vary:
+      - Accept-Encoding
       x-envoy-upstream-service-time:
-      - '4017'
+      - '3194'
     status:
       code: 200
       message: OK

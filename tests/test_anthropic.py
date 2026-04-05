@@ -30,6 +30,7 @@ def test_prompt():
         "content": [{"citations": None, "parsed_output": None, "text": "- Captain\n- Scoop", "type": "text"}],
         "model": "claude-sonnet-4-5-20250929",
         "role": "assistant",
+        "stop_details": None,
         "stop_reason": "end_turn",
         "stop_sequence": None,
         "type": "message",
@@ -54,6 +55,7 @@ async def test_async_prompt():
         "content": [{"citations": None, "parsed_output": None, "text": "- Captain\n- Scoop", "type": "text"}],
         "model": "claude-sonnet-4-5-20250929",
         "role": "assistant",
+        "stop_details": None,
         "stop_reason": "end_turn",
         "stop_sequence": None,
         "type": "message",
@@ -84,6 +86,7 @@ def test_image_prompt():
         "content": [{"citations": None, "parsed_output": None, "text": EXPECTED_IMAGE_TEXT, "type": "text"}],
         "model": "claude-sonnet-4-5-20250929",
         "role": "assistant",
+        "stop_details": None,
         "stop_reason": "end_turn",
         "stop_sequence": None,
         "type": "message",
@@ -158,12 +161,11 @@ def test_schema_prompt():
         "name": "Biscuit",
         "age": 4,
         "bio": (
-            "Biscuit is a loyal golden retriever with a gentle temperament and "
-            "boundless enthusiasm for life. He loves swimming in lakes, playing fetch "
-            "until sunset, and has an uncanny ability to sense when someone needs "
-            "comfort. Known in his neighborhood for his friendly demeanor, Biscuit "
-            "volunteers at the local children's hospital bringing joy to young "
-            "patients."
+            "Biscuit is a golden retriever with a gentle soul and boundless "
+            "enthusiasm. He greets every person with a wagging tail and has an uncanny "
+            "ability to sense when someone needs comfort. His favorite activities "
+            "include playing fetch at the beach, napping in sunny spots, and stealing "
+            "socks to add to his secret collection under the bed."
         ),
     }
 
@@ -178,24 +180,22 @@ async def test_schema_prompt_async():
     dog_json = await response.text()
     dog = json.loads(dog_json)
     assert dog == {
+        "name": "Luna",
         "age": 4,
         "bio": (
-            "Nebula is a spirited Australian Shepherd mix with striking blue-merle "
-            "coat and one bright amber eye, one pale blue. She's a certified therapy "
-            "dog who visits children's hospitals weekly, has an uncanny ability to "
-            "sense when someone needs comfort, and loves solving puzzle toys. Her "
-            "favorite activities include agility courses, swimming in lakes, and "
-            "gentle play with her best friend\u2014a rescue cat named Comet. Nebula "
-            "once alerted her family to a gas leak, saving their lives, and she's "
-            "currently training to be a search and rescue dog."
+            "Luna is a brilliant Golden Retriever with a heart of gold who serves as "
+            "a certified therapy dog at children's hospitals. She has an uncanny "
+            "ability to sense when someone needs comfort and gently rests her head on "
+            "their lap. Luna loves swimming in lakes, playing fetch with her favorite "
+            "tennis ball, and has learned over 50 commands including helping her owner "
+            "retrieve items from around the house."
         ),
-        "name": "Nebula",
     }
 
 
 @pytest.mark.vcr
 def test_prompt_with_prefill_and_stop_sequences():
-    model = llm.get_model("claude-3.5-haiku")
+    model = llm.get_model("claude-haiku-4.5")
     response = model.prompt(
         "Very short function describing a pelican",
         prefill="```python",
@@ -205,9 +205,8 @@ def test_prompt_with_prefill_and_stop_sequences():
     )
     text = response.text()
     assert text == (
-        "\ndef describe_pelican():\n"
-        '    """Returns a brief description of a pelican."""\n'
-        '    return "Large seabird with a massive bill, capable of scooping fish from water."\n'
+        "\ndef pelican():\n"
+        '    return "A large waterbird with a long bill and a throat pouch for catching fish."\n'
     )
 
 
@@ -233,6 +232,7 @@ def test_thinking_prompt():
         ],
         "model": "claude-sonnet-4-5-20250929",
         "role": "assistant",
+        "stop_details": None,
         "stop_reason": "end_turn",
         "stop_sequence": None,
         "type": "message",
@@ -245,7 +245,7 @@ def test_thinking_prompt():
 
 @pytest.mark.vcr
 def test_tools():
-    model = llm.get_model("claude-3.5-haiku")
+    model = llm.get_model("claude-haiku-4.5")
     names = ["Charles", "Sammy"]
     chain_response = model.chain(
         "Two names for a pet pelican",
@@ -256,11 +256,10 @@ def test_tools():
     )
     text = chain_response.text()
     assert text == (
-        "I'll help you generate two potential names for a pet pelican by using the pelican "
-        "name generator tool. Great! The tool has generated two fun names for a pet pelican:\n"
-        "1. Charles - A dignified name that could suit a sophisticated pelican\n"
-        "2. Sammy - A friendly and playful name that gives your pelican a cute personality\n\n"
-        "Would you like me to generate more names or do you like these options?"
+        " Here are two great names for your pet pelican:\n\n"
+        "1. **Charles** - A sophisticated and dignified name, perfect for a pelican with personality!\n"
+        "2. **Sammy** - A friendly and playful name that gives off warm, approachable vibes.\n\n"
+        "Either of these would make an excellent name for your feathered friend! \U0001f985"
     )
     tool_calls = chain_response._responses[0].tool_calls()
     assert len(tool_calls) == 2

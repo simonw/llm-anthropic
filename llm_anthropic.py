@@ -4,7 +4,6 @@ import llm
 import json
 from typing import Optional, List
 from pydantic import Field, field_validator, model_validator
-from json_schema_to_pydantic import create_model as json_schema_to_model
 
 DEFAULT_THINKING_TOKENS = 1024
 DEFAULT_TEMPERATURE = 1.0
@@ -795,19 +794,10 @@ class _Shared:
         use_structured_outputs = prompt.schema and self.use_structured_outputs
 
         if use_structured_outputs:
-            if self.supports_adaptive_thinking:
-                # 4.6: output_config.format, no beta header
-                kwargs.setdefault("output_config", {})["format"] = {
-                    "type": "json_schema",
-                    "schema": transform_schema(prompt.schema),
-                }
-            else:
-                # Pre-4.6: output_format with beta header
-                betas.append("structured-outputs-2025-11-13")
-                kwargs["output_format"] = {
-                    "type": "json_schema",
-                    "schema": transform_schema(prompt.schema),
-                }
+            kwargs.setdefault("output_config", {})["format"] = {
+                "type": "json_schema",
+                "schema": transform_schema(prompt.schema),
+            }
 
         if betas:
             kwargs["betas"] = betas
@@ -907,14 +897,6 @@ class ClaudeMessages(_Shared, llm.KeyModel):
         else:
             messages_client = client.messages
 
-        # For structured outputs with output_format (pre-4.6), convert JSON schema
-        # to Pydantic model for beta stream(). output_config.format (4.6) uses raw
-        # JSON schema dict directly.
-        if "output_format" in kwargs and stream:
-            schema = kwargs["output_format"]["schema"]
-            pydantic_model = json_schema_to_model(schema)
-            kwargs["output_format"] = pydantic_model
-
         if stream:
             with messages_client.stream(**kwargs) as stream:
                 if prefill_text:
@@ -955,14 +937,6 @@ class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
         else:
             messages_client = client.messages
         prefill_text = self.prefill_text(prompt)
-
-        # For structured outputs with output_format (pre-4.6), convert JSON schema
-        # to Pydantic model for beta stream(). output_config.format (4.6) uses raw
-        # JSON schema dict directly.
-        if "output_format" in kwargs and stream:
-            schema = kwargs["output_format"]["schema"]
-            pydantic_model = json_schema_to_model(schema)
-            kwargs["output_format"] = pydantic_model
 
         if stream:
             async with messages_client.stream(**kwargs) as stream_obj:
