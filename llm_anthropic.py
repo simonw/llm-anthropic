@@ -1,6 +1,7 @@
 from anthropic import Anthropic, AsyncAnthropic, transform_schema
 import enum
 import llm
+from llm.parts import StreamEvent
 import json
 from typing import Optional, List
 from pydantic import Field, field_validator, model_validator
@@ -898,33 +899,146 @@ class ClaudeMessages(_Shared, llm.KeyModel):
             messages_client = client.messages
 
         if stream:
-            with messages_client.stream(**kwargs) as stream:
+            with messages_client.stream(**kwargs) as stream_obj:
+                part_index = 0
+                current_block_type = None
+                current_block_id = None
+                current_block_name = None
+                is_server_tool = False
+
                 if prefill_text:
-                    yield prefill_text
-                for chunk in stream:
-                    if hasattr(chunk, "delta"):
+                    yield StreamEvent(
+                        type="text", chunk=prefill_text, part_index=part_index
+                    )
+
+                for chunk in stream_obj:
+                    if chunk.type == "content_block_start":
+                        block = chunk.content_block
+                        block_type = getattr(block, "type", None)
+                        if current_block_type is not None:
+                            part_index += 1
+                        current_block_type = block_type
+                        current_block_id = getattr(block, "id", None)
+                        current_block_name = getattr(block, "name", None)
+                        is_server_tool = block_type in (
+                            "server_tool_use",
+                            "web_search_tool_result",
+                        )
+
+                        if block_type in ("tool_use", "server_tool_use"):
+                            yield StreamEvent(
+                                type="tool_call_name",
+                                chunk=current_block_name or "",
+                                part_index=part_index,
+                                tool_call_id=current_block_id,
+                                server_executed=(block_type == "server_tool_use"),
+                            )
+                        elif block_type == "web_search_tool_result":
+                            # Server-side tool result
+                            pass  # Content comes in the final message
+
+                    elif chunk.type == "content_block_delta":
                         delta = chunk.delta
-                        if hasattr(delta, "text"):
-                            yield delta.text
-                        elif hasattr(delta, "partial_json") and prompt.schema:
-                            yield delta.partial_json
+                        delta_type = getattr(delta, "type", None)
+
+                        if delta_type == "thinking_delta":
+                            yield StreamEvent(
+                                type="reasoning",
+                                chunk=delta.thinking,
+                                part_index=part_index,
+                            )
+                        elif delta_type == "text_delta":
+                            yield StreamEvent(
+                                type="text",
+                                chunk=delta.text,
+                                part_index=part_index,
+                            )
+                        elif delta_type == "input_json_delta":
+                            yield StreamEvent(
+                                type="tool_call_args",
+                                chunk=delta.partial_json,
+                                part_index=part_index,
+                                tool_call_id=current_block_id,
+                                server_executed=is_server_tool,
+                            )
+
                 # This records usage and other data:
                 last_message = self._model_dump_suppress_warnings(
-                    stream.get_final_message()
+                    stream_obj.get_final_message()
                 )
                 response.response_json = last_message
+
+                # Extract server-side tool results from final message
+                for content_block in last_message.get("content", []):
+                    if content_block.get("type") == "web_search_tool_result":
+                        part_index += 1
+                        result_content = content_block.get("content", [])
+                        result_text = json.dumps(result_content) if result_content else ""
+                        yield StreamEvent(
+                            type="tool_result",
+                            chunk=result_text,
+                            part_index=part_index,
+                            tool_call_id=content_block.get("tool_use_id"),
+                            server_executed=True,
+                            tool_name="web_search",
+                        )
+
                 if self.add_tool_usage(response, last_message):
                     # Avoid "can have dragons.Now that I " bug
-                    yield " "
+                    yield StreamEvent(
+                        type="text", chunk=" ", part_index=part_index + 1
+                    )
         else:
             completion = messages_client.create(**kwargs)
-            text = "".join(
-                [item.text for item in completion.content if hasattr(item, "text")]
-            )
-            yield prefill_text + text
+            part_index = 0
+            for item in completion.content:
+                item_type = getattr(item, "type", None)
+                if item_type == "thinking":
+                    yield StreamEvent(
+                        type="reasoning",
+                        chunk=item.thinking,
+                        part_index=part_index,
+                    )
+                    part_index += 1
+                elif item_type == "text":
+                    text = (prefill_text + item.text) if prefill_text else item.text
+                    prefill_text = ""  # Only prepend once
+                    yield StreamEvent(
+                        type="text", chunk=text, part_index=part_index
+                    )
+                    part_index += 1
+                elif item_type in ("tool_use", "server_tool_use"):
+                    yield StreamEvent(
+                        type="tool_call_name",
+                        chunk=item.name,
+                        part_index=part_index,
+                        tool_call_id=item.id,
+                        server_executed=(item_type == "server_tool_use"),
+                    )
+                    yield StreamEvent(
+                        type="tool_call_args",
+                        chunk=json.dumps(item.input),
+                        part_index=part_index,
+                        tool_call_id=item.id,
+                        server_executed=(item_type == "server_tool_use"),
+                    )
+                    part_index += 1
+                elif item_type == "web_search_tool_result":
+                    result_content = getattr(item, "content", [])
+                    result_text = json.dumps(
+                        [block if isinstance(block, dict) else block.model_dump() for block in result_content]
+                    ) if result_content else ""
+                    yield StreamEvent(
+                        type="tool_result",
+                        chunk=result_text,
+                        part_index=part_index,
+                        tool_call_id=getattr(item, "tool_use_id", None),
+                        server_executed=True,
+                        tool_name="web_search",
+                    )
+                    part_index += 1
             response.response_json = completion.model_dump()
-            if self.add_tool_usage(response, response.response_json):
-                yield " "
+            self.add_tool_usage(response, response.response_json)
         self.set_usage(response)
 
 
@@ -940,27 +1054,134 @@ class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
 
         if stream:
             async with messages_client.stream(**kwargs) as stream_obj:
+                part_index = 0
+                current_block_type = None
+                current_block_id = None
+                current_block_name = None
+                is_server_tool = False
+
                 if prefill_text:
-                    yield prefill_text
+                    yield StreamEvent(
+                        type="text", chunk=prefill_text, part_index=part_index
+                    )
+
                 async for chunk in stream_obj:
-                    if hasattr(chunk, "delta"):
+                    if chunk.type == "content_block_start":
+                        block = chunk.content_block
+                        block_type = getattr(block, "type", None)
+                        if current_block_type is not None:
+                            part_index += 1
+                        current_block_type = block_type
+                        current_block_id = getattr(block, "id", None)
+                        current_block_name = getattr(block, "name", None)
+                        is_server_tool = block_type in (
+                            "server_tool_use",
+                            "web_search_tool_result",
+                        )
+
+                        if block_type in ("tool_use", "server_tool_use"):
+                            yield StreamEvent(
+                                type="tool_call_name",
+                                chunk=current_block_name or "",
+                                part_index=part_index,
+                                tool_call_id=current_block_id,
+                                server_executed=(block_type == "server_tool_use"),
+                            )
+
+                    elif chunk.type == "content_block_delta":
                         delta = chunk.delta
-                        if hasattr(delta, "text"):
-                            yield delta.text
-                        elif hasattr(delta, "partial_json") and prompt.schema:
-                            yield delta.partial_json
+                        delta_type = getattr(delta, "type", None)
+
+                        if delta_type == "thinking_delta":
+                            yield StreamEvent(
+                                type="reasoning",
+                                chunk=delta.thinking,
+                                part_index=part_index,
+                            )
+                        elif delta_type == "text_delta":
+                            yield StreamEvent(
+                                type="text",
+                                chunk=delta.text,
+                                part_index=part_index,
+                            )
+                        elif delta_type == "input_json_delta":
+                            yield StreamEvent(
+                                type="tool_call_args",
+                                chunk=delta.partial_json,
+                                part_index=part_index,
+                                tool_call_id=current_block_id,
+                                server_executed=is_server_tool,
+                            )
+
             response.response_json = self._model_dump_suppress_warnings(
                 await stream_obj.get_final_message()
             )
-            # TODO: Test this:
+
+            # Extract server-side tool results from final message
+            for content_block in response.response_json.get("content", []):
+                if content_block.get("type") == "web_search_tool_result":
+                    part_index += 1
+                    result_content = content_block.get("content", [])
+                    result_text = json.dumps(result_content) if result_content else ""
+                    yield StreamEvent(
+                        type="tool_result",
+                        chunk=result_text,
+                        part_index=part_index,
+                        tool_call_id=content_block.get("tool_use_id"),
+                        server_executed=True,
+                        tool_name="web_search",
+                    )
+
             self.add_tool_usage(response, response.response_json)
         else:
             completion = await messages_client.create(**kwargs)
-            text = "".join(
-                [item.text for item in completion.content if hasattr(item, "text")]
-            )
-            yield prefill_text + text
+            part_index = 0
+            for item in completion.content:
+                item_type = getattr(item, "type", None)
+                if item_type == "thinking":
+                    yield StreamEvent(
+                        type="reasoning",
+                        chunk=item.thinking,
+                        part_index=part_index,
+                    )
+                    part_index += 1
+                elif item_type == "text":
+                    text = (prefill_text + item.text) if prefill_text else item.text
+                    prefill_text = ""
+                    yield StreamEvent(
+                        type="text", chunk=text, part_index=part_index
+                    )
+                    part_index += 1
+                elif item_type in ("tool_use", "server_tool_use"):
+                    yield StreamEvent(
+                        type="tool_call_name",
+                        chunk=item.name,
+                        part_index=part_index,
+                        tool_call_id=item.id,
+                        server_executed=(item_type == "server_tool_use"),
+                    )
+                    yield StreamEvent(
+                        type="tool_call_args",
+                        chunk=json.dumps(item.input),
+                        part_index=part_index,
+                        tool_call_id=item.id,
+                        server_executed=(item_type == "server_tool_use"),
+                    )
+                    part_index += 1
+                elif item_type == "web_search_tool_result":
+                    result_content = getattr(item, "content", [])
+                    result_text = json.dumps(
+                        [block if isinstance(block, dict) else block.model_dump() for block in result_content]
+                    ) if result_content else ""
+                    yield StreamEvent(
+                        type="tool_result",
+                        chunk=result_text,
+                        part_index=part_index,
+                        tool_call_id=getattr(item, "tool_use_id", None),
+                        server_executed=True,
+                        tool_name="web_search",
+                    )
+                    part_index += 1
             response.response_json = completion.model_dump()
-            # TODO: Test this:
             self.add_tool_usage(response, response.response_json)
         self.set_usage(response)

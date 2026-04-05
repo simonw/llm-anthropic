@@ -1,0 +1,126 @@
+interactions:
+- request:
+    body: '{"max_tokens":8192,"messages":[{"role":"user","content":[{"type":"text","text":"Generate
+      one name for a pet pelican"}]}],"model":"claude-haiku-4-5-20251001","temperature":1.0,"tools":[{"name":"pelican_name_generator","description":"","input_schema":{"properties":{},"type":"object"}}],"stream":true}'
+    headers:
+      Accept:
+      - application/json
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '299'
+      Content-Type:
+      - application/json
+      Host:
+      - api.anthropic.com
+      User-Agent:
+      - Anthropic/Python 0.89.0
+      X-Stainless-Arch:
+      - arm64
+      X-Stainless-Async:
+      - 'false'
+      X-Stainless-Helper-Method:
+      - stream
+      X-Stainless-Lang:
+      - python
+      X-Stainless-OS:
+      - MacOS
+      X-Stainless-Package-Version:
+      - 0.89.0
+      X-Stainless-Runtime:
+      - CPython
+      X-Stainless-Runtime-Version:
+      - 3.14.3
+      X-Stainless-Stream-Helper:
+      - messages
+      anthropic-version:
+      - '2023-06-01'
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-timeout:
+      - NOT_GIVEN
+    method: POST
+    uri: https://api.anthropic.com/v1/messages
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA3SQQU/DMAyF7/sVU86r1G6tEL2xA3DlggQIRSbx1mhpUhKn0jT1v+NIq6Agcsv7
+        nv1s44iO2nWPMcIRZSQItNJA0K4vgs4DilYsoNjMf9FeRO81WrYoC0lj0YE5paIummJbbpuqLCu2
+        G517xKMsq717hv5wf6PUy+0T7dzr490ZHtizTGIheJsFiNFwrMuxyjviYUX79r4RkfwgA0L0TrQu
+        WXuVIn4mdAoXokYCY+OspXl644ZEkvwJHcOm3nEIqA6l4s5kvJNLRzlzxvo/NtfmABw67DGAlU3/
+        1/9Nq+43nTbCJ/op1VwRMYxGoSSDga+TL6Mh6Hxkd8CQF5dH9IycJwkjbw0ffMhpWl/ftFp9AQAA
+        //9KhUQ5NDjjk3Lyk7OxRzwWJWCrUlIrIB5Glgf5F6qvJD8/J760OBUW+SB+KTD6nav8zIoynQMK
+        y00KwoJLQ1IsXcrzzIGq8hJzQfoKUnMykxPz4kFcoD/ygGFTkl8EthIYEkALakGBnJMD8jzcspTM
+        otTkEpgXgf4DAAAA//+C+q8gMy8dzUMKSiBBJaAaAAAAAP//whoGwKRckog/DMBKUMIAIoJwDiQe
+        s4DpEq64ABhumcBYzgInViWlWpArAQAAAP//whEL+QWEIiG/AMl+BaR4BQAAAP//SkXNylh9gyKp
+        hOR6lPyEHIFE5qpa2mUrjHwAT8xQjwMAAAD//0pFL8MwAxFZTkkBTT8AAAD//wMAz7IvygQFAAA=
+    headers:
+      CF-RAY:
+      - 9e793df2cb2c16a4-SJC
+      Cache-Control:
+      - no-cache
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Security-Policy:
+      - default-src 'none'; frame-ancestors 'none'
+      Content-Type:
+      - text/event-stream; charset=utf-8
+      Date:
+      - Sun, 05 Apr 2026 14:28:55 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      X-Robots-Tag:
+      - none
+      anthropic-organization-id:
+      - b320df16-c763-4455-b901-3f7d54e9a012
+      anthropic-ratelimit-input-tokens-limit:
+      - '4000000'
+      anthropic-ratelimit-input-tokens-remaining:
+      - '4000000'
+      anthropic-ratelimit-input-tokens-reset:
+      - '2026-04-05T14:28:55Z'
+      anthropic-ratelimit-output-tokens-limit:
+      - '800000'
+      anthropic-ratelimit-output-tokens-remaining:
+      - '800000'
+      anthropic-ratelimit-output-tokens-reset:
+      - '2026-04-05T14:28:55Z'
+      anthropic-ratelimit-requests-limit:
+      - '20000'
+      anthropic-ratelimit-requests-remaining:
+      - '19999'
+      anthropic-ratelimit-requests-reset:
+      - '2026-04-05T14:28:55Z'
+      anthropic-ratelimit-tokens-limit:
+      - '4800000'
+      anthropic-ratelimit-tokens-remaining:
+      - '4800000'
+      anthropic-ratelimit-tokens-reset:
+      - '2026-04-05T14:28:55Z'
+      cf-cache-status:
+      - DYNAMIC
+      request-id:
+      - req_011CZknMJt3GegSmXXNdzLJB
+      server-timing:
+      - x-originResponse;dur=785
+      set-cookie:
+      - _cfuvid=LPoCNiCeOckIbmQqkrEzj3Dd9fr9lbumjf75YQc3Ols-1775399334.848694-1.0.1.1-0T.5kfVNs208onCSQobh8Al0mZ9okm5tndTXm63dIm8;
+        HttpOnly; SameSite=None; Secure; Path=/; Domain=api.anthropic.com
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      vary:
+      - Accept-Encoding
+      x-envoy-upstream-service-time:
+      - '783'
+    status:
+      code: 200
+      message: OK
+version: 1

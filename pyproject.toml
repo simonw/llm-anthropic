@@ -27,6 +27,9 @@ dev = ["pytest", "pytest-recording", "pytest-asyncio", "cogapp"]
 [tool.uv]
 package = true
 
+[tool.uv.sources]
+llm = { path = "/Users/simon/Dropbox/dev/llm", editable = true }
+
 [tool.pytest.ini_options]
 asyncio_mode = "strict"
 asyncio_default_fixture_loop_scope = "function"

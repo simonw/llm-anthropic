@@ -362,3 +362,72 @@ def test_opus_46_schema():
     assert "name" in dog
     assert "age" in dog
     assert "bio" in dog
+
+
+# Phase 3: StreamEvent tests
+from llm.parts import StreamEvent, TextPart, ReasoningPart, ToolCallPart, ToolResultPart
+
+
+@pytest.mark.vcr
+def test_stream_events_text():
+    """stream_events() yields text StreamEvents."""
+    model = llm.get_model("claude-haiku-4.5")
+    model.key = model.key or ANTHROPIC_API_KEY
+    response = model.prompt("Say just hello")
+    events = list(response.stream_events())
+    text_events = [e for e in events if e.type == "text"]
+    assert len(text_events) > 0
+    text = "".join(e.chunk for e in text_events)
+    assert "hello" in text.lower() or "Hello" in text
+
+
+@pytest.mark.vcr
+def test_stream_events_thinking():
+    """stream_events() yields reasoning StreamEvents for thinking."""
+    model = llm.get_model("claude-haiku-4.5")
+    model.key = model.key or ANTHROPIC_API_KEY
+    response = model.prompt("Two names for a pet pelican, be brief", thinking=True)
+    events = list(response.stream_events())
+    reasoning_events = [e for e in events if e.type == "reasoning"]
+    text_events = [e for e in events if e.type == "text"]
+    assert len(reasoning_events) > 0, "Should have reasoning events"
+    assert len(text_events) > 0, "Should have text events"
+    # Reasoning should be in earlier part_index than text
+    assert reasoning_events[0].part_index < text_events[0].part_index
+
+
+@pytest.mark.vcr
+def test_parts_thinking():
+    """response.parts includes ReasoningPart and TextPart for thinking responses."""
+    model = llm.get_model("claude-haiku-4.5")
+    model.key = model.key or ANTHROPIC_API_KEY
+    response = model.prompt("Two names for a pet pelican, be brief", thinking=True)
+    response.text()
+    parts = response.parts
+    reasoning_parts = [p for p in parts if isinstance(p, ReasoningPart)]
+    text_parts = [p for p in parts if isinstance(p, TextPart)]
+    assert len(reasoning_parts) >= 1, "Should have reasoning part"
+    assert len(text_parts) >= 1, "Should have text part"
+    assert reasoning_parts[0].text, "Reasoning text should not be empty"
+    assert text_parts[0].text, "Text should not be empty"
+
+
+@pytest.mark.vcr
+def test_stream_events_tool_calls():
+    """stream_events() yields tool call StreamEvents."""
+    model = llm.get_model("claude-haiku-4.5")
+    model.key = model.key or ANTHROPIC_API_KEY
+    names = ["Charles"]
+    response = model.prompt(
+        "Generate one name for a pet pelican",
+        tools=[
+            llm.Tool.function(lambda: names.pop(0), name="pelican_name_generator"),
+        ],
+        key=ANTHROPIC_API_KEY,
+    )
+    events = list(response.stream_events())
+    name_events = [e for e in events if e.type == "tool_call_name"]
+    args_events = [e for e in events if e.type == "tool_call_args"]
+    assert len(name_events) >= 1, "Should have tool_call_name event"
+    assert name_events[0].chunk == "pelican_name_generator"
+    assert name_events[0].tool_call_id is not None

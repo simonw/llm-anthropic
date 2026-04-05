@@ -1,0 +1,142 @@
+interactions:
+- request:
+    body: '{"max_tokens":8192,"messages":[{"role":"user","content":[{"type":"text","text":"Two
+      names for a pet pelican, be brief"}]}],"model":"claude-haiku-4-5-20251001","temperature":1.0,"thinking":{"type":"enabled","budget_tokens":1024},"stream":true}'
+    headers:
+      Accept:
+      - application/json
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '242'
+      Content-Type:
+      - application/json
+      Host:
+      - api.anthropic.com
+      User-Agent:
+      - Anthropic/Python 0.89.0
+      X-Stainless-Arch:
+      - arm64
+      X-Stainless-Async:
+      - 'false'
+      X-Stainless-Helper-Method:
+      - stream
+      X-Stainless-Lang:
+      - python
+      X-Stainless-OS:
+      - MacOS
+      X-Stainless-Package-Version:
+      - 0.89.0
+      X-Stainless-Runtime:
+      - CPython
+      X-Stainless-Runtime-Version:
+      - 3.14.3
+      X-Stainless-Stream-Helper:
+      - messages
+      anthropic-version:
+      - '2023-06-01'
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-timeout:
+      - NOT_GIVEN
+    method: POST
+    uri: https://api.anthropic.com/v1/messages
+  response:
+    body:
+      string: "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"model\":\"claude-haiku-4-5-20251001\",\"id\":\"msg_01HXtenSNQ66snZkt2iQ96iN\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":46,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":3,\"service_tier\":\"standard\",\"inference_geo\":\"not_available\"}}
+        \     }\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"thinking\",\"thinking\":\"\",\"signature\":\"\"}
+        \ }\n\nevent: ping\ndata: {\"type\": \"ping\"}\n\nevent: content_block_delta\ndata:
+        {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"thinking_delta\",\"thinking\":\"The
+        user wants\"}    }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"thinking_delta\",\"thinking\":\"
+        two names for a pet pelican and wants me to be brief. Let me think of fitting
+        names for a pelican:\\n\\nPelicans are known for their large bills/\"}       }\n\nevent:
+        content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"thinking_delta\",\"thinking\":\"pouches,
+        they're water birds, somewhat humorous looking. Some name ideas:\\n- Pouch\"}
+        \    }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"thinking_delta\",\"thinking\":\"
+        (references the bill pouch)\\n- Pel\xE9 (play on pelican\"}      }\n\nevent:
+        content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"thinking_delta\",\"thinking\":\")\\n-
+        Captain Bill (nautical, references the bill)\\n- Beaky\"}  }\n\nevent: content_block_delta\ndata:
+        {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"thinking_delta\",\"thinking\":\"\\n-
+        Scoop\\n- Pete\\n- Squirt\\n\\nLet me pick two good ones that are brief and
+        fit\"}          }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"thinking_delta\",\"thinking\":\"
+        the bird:\\n\\n1. **Pouch** - simple, references the distinctive feature\\n2.
+        **Captain\"}   }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"thinking_delta\",\"thinking\":\"
+        Bill** - fun, nautical feeling\\n\\nOr maybe:\\n1. **Scoop** - fun, playful,
+        references how\"}          }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"thinking_delta\",\"thinking\":\"
+        they scoop fish\\n2. **Pete** - simple, friendly\\n\\nI'll go with something
+        brief and cute.\"}           }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"signature_delta\",\"signature\":\"EugGCmMIDBgCKkC4o7+2tlTqPK2ZlQLyK9tY2Dyg+C77F+04TZ3K/dP9azBCKxI3g8WkihVTlMK6QvaRKAD2XgK6h88PeYp9RbfoMhljbGF1ZGUtaGFpa3UtNC01LTIwMjUxMDAxOAASDFA+RCOspsTkEQ0HURoMPDe9uRMVcgxZnX+XIjC1mC/8aUBKbUIYgMmbZMeIbMdNBzTNAw8FzahBq99mlZGi0l79yYuXImzYE7FFmhIqsgVRYviZv7w8Jmh15rv5Kg3FJaY7cCL3peV8Gu1EOGzHwkRzcLQPtdT1MQXtxECCGfpHsSRuMZTVsV5nduJGYrzA+742n9J2iwj7hj5oOzWa6v0ASpz893VzWloMErQDI7xNIIN2Gc1wRbRdLn8hEWeMuVcTohdfOQdlQbc+hR/vXLvTv3aSASLZZuMU5aZxoNT+gJsJU5hlEfIyF6hBEggfZ7Cs+2KJ3GjAWeCKCHVutdQ3PmR6QwCo0/vI2fTp1CRYQk6uNP/ROSxODqdJxSKJVmQyTc4n7rmDnlFjUCblqi7YS8WSdK4bqm1MQgqGYdVZfq9P/OQXa/uxMgOZq367116TCVlgvIXwhLmW99Ezi8xpVKCTDiAlg6wvV95gVZUG6RNJcXmxVOSM9ueApBvX6wiMg53rYxX20AqM2v65ZnoK29rnNClfiXBjCpI2dojv299yFLJMJGBxZxeHiJb5CVaceEQzij6kxUYt0Tpx4TUEer/93xyMkEnxGRWN8w/jdFN0uUBZeTr5tUp04BNDkcvzPmp3xc0YOzqp2Os2GcOCrJgY9ad4zoI10sauri2Fl9IyuSd8s7Xir2z277zH5aOwgAWeMgX3IIegw82bdPb8b+c4TDf7BKnX7JG0D6sQYqlSeuGH+vMZz8Q+mw4bZp9OXzsji8ymH15oJ9L+dimxxZ8U6broV04M6M9k4OB3wE17vchb9zYYn+DddSr5uM+xApj5Br8ScLma9hj02E2tLpzyufz2KRIpm6CXWwM2EkUoFQoG8pQXKzoD12trkWcObAmUQVyDXAsxBG79QwgrIhHhDOhzms1g/4AQj/8UvDdnUbO4wZsFNb1IGtiYhwm+cbUqMZwJHDyuYM8T1ap3lSM4JhIxBZqmXRBQGQc5m0vyRiPLymQIvkpy5cDL8PEYAQ==\"}
+        \   }\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0
+        \         }\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":1,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\nevent:
+        content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"1.
+        **Pouch** \u2013 references their distinctive bill pouch\\n2. **Captain Bill**
+        \u2013 nautical and\"}               }\n\nevent: content_block_delta\ndata:
+        {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"
+        fun\"}        }\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":1}\n\nevent:
+        message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null},\"usage\":{\"input_tokens\":46,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":234}
+        \             }\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"               }\n\n"
+    headers:
+      CF-RAY:
+      - 9e793db85ffa7e30-SJC
+      Cache-Control:
+      - no-cache
+      Connection:
+      - keep-alive
+      Content-Security-Policy:
+      - default-src 'none'; frame-ancestors 'none'
+      Content-Type:
+      - text/event-stream; charset=utf-8
+      Date:
+      - Sun, 05 Apr 2026 14:28:45 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      X-Robots-Tag:
+      - none
+      anthropic-organization-id:
+      - b320df16-c763-4455-b901-3f7d54e9a012
+      anthropic-ratelimit-input-tokens-limit:
+      - '4000000'
+      anthropic-ratelimit-input-tokens-remaining:
+      - '4000000'
+      anthropic-ratelimit-input-tokens-reset:
+      - '2026-04-05T14:28:45Z'
+      anthropic-ratelimit-output-tokens-limit:
+      - '800000'
+      anthropic-ratelimit-output-tokens-remaining:
+      - '800000'
+      anthropic-ratelimit-output-tokens-reset:
+      - '2026-04-05T14:28:45Z'
+      anthropic-ratelimit-requests-limit:
+      - '20000'
+      anthropic-ratelimit-requests-remaining:
+      - '19999'
+      anthropic-ratelimit-requests-reset:
+      - '2026-04-05T14:28:45Z'
+      anthropic-ratelimit-tokens-limit:
+      - '4800000'
+      anthropic-ratelimit-tokens-remaining:
+      - '4800000'
+      anthropic-ratelimit-tokens-reset:
+      - '2026-04-05T14:28:45Z'
+      cf-cache-status:
+      - DYNAMIC
+      request-id:
+      - req_011CZknLck4BQCMFWnzKYGJC
+      server-timing:
+      - x-originResponse;dur=416
+      set-cookie:
+      - _cfuvid=2sOFv4dIKY0Ox6wYxMinZdYFr9B9qenYjdeZ_kqbXJA-1775399325.493-1.0.1.1-nlJQZcGy7yKDkDO.r4fEO9QhuqXwaGRApKVzhuTlj88;
+        HttpOnly; SameSite=None; Secure; Path=/; Domain=api.anthropic.com
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      x-envoy-upstream-service-time:
+      - '415'
+    status:
+      code: 200
+      message: OK
+version: 1
