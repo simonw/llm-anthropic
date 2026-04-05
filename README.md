@@ -291,24 +291,24 @@ To enable debug logs while running ([like this](https://github.com/simonw/llm-an
 export ANTHROPIC_LOG=debug
 ```
 
-This project uses [pytest-recording](https://github.com/kiwicom/pytest-recording) to record Anthropic API responses for the tests.
+This project uses [pytest-recording](https://github.com/kiwicom/pytest-recording) to record Anthropic API responses for the tests, and [inline-snapshot](https://15r10nk.github.io/inline-snapshot/) for test assertions.
 
 If you add a new test that calls the API you can capture the API response like this:
 ```bash
-PYTEST_ANTHROPIC_API_KEY="$(llm keys get anthropic)" pytest --record-mode once
+PYTEST_ANTHROPIC_API_KEY="$(llm keys get anthropic)" uv run pytest --record-mode once
 ```
 You will need to have stored a valid Anthropic API key using this command first:
 ```bash
 llm keys set anthropic
 # Paste key here
 ```
-I use the following sequence:
+To re-record all cassettes and update all inline snapshot assertions in one command:
 ```bash
-# First delete the relevant cassette if it exists already:
+rm tests/cassettes/test_anthropic/*.yaml
+PYTEST_ANTHROPIC_API_KEY="$(llm keys get anthropic)" uv run pytest --record-mode all --inline-snapshot=fix
+```
+To re-record a single test:
+```bash
 rm tests/cassettes/test_anthropic/test_thinking_prompt.yaml
-# Run this failing test to recreate the cassette
-PYTEST_ANTHROPIC_API_KEY="$(llm keys get claude)" uv run pytest -k test_thinking_prompt --record-mode once
-# Now run the test again with --pdb to figure out how to update it
-uv run pytest -k test_thinking_prompt --pdb
-# Edit test
+PYTEST_ANTHROPIC_API_KEY="$(llm keys get anthropic)" uv run pytest -k test_thinking_prompt --record-mode once --inline-snapshot=fix
 ```
