@@ -616,55 +616,75 @@ class _Shared:
                 if assistant_content:
                     messages.append({"role": "assistant", "content": assistant_content})
 
-        # Handle current prompt's tool results and user content together
-        user_content = []
+        # If parts= was provided, use those directly
+        if prompt._parts:
+            from llm.parts import TextPart
 
-        # Add attachments
-        if prompt.attachments:
-            for attachment in prompt.attachments:
-                attachment_type = (
-                    "document"
-                    if attachment.resolve_type() == "application/pdf"
-                    else "image"
-                )
-                user_content.append(
-                    {
-                        "type": attachment_type,
-                        "source": source_for_attachment(attachment),
+            current_role = None
+            current_content = []
+            for part in prompt._parts:
+                if isinstance(part, TextPart):
+                    if part.role != current_role:
+                        if current_content:
+                            messages.append(
+                                {"role": current_role, "content": current_content}
+                            )
+                        current_role = part.role
+                        current_content = []
+                    current_content.append({"type": "text", "text": part.text})
+            if current_content:
+                messages.append({"role": current_role, "content": current_content})
+        else:
+            # Handle current prompt's tool results and user content together
+            user_content = []
+
+            # Add attachments
+            if prompt.attachments:
+                for attachment in prompt.attachments:
+                    attachment_type = (
+                        "document"
+                        if attachment.resolve_type() == "application/pdf"
+                        else "image"
+                    )
+                    user_content.append(
+                        {
+                            "type": attachment_type,
+                            "source": source_for_attachment(attachment),
+                        }
+                    )
+
+                # Add cache control if needed
+                if prompt.options.cache and user_content:
+                    user_content[-1]["cache_control"] = {"type": "ephemeral"}
+
+            # Add current prompt's tool results
+            if prompt.tool_results:
+                for tool_result in prompt.tool_results:
+                    user_content.append(
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": tool_result.tool_call_id,
+                            "content": tool_result.output,
+                        }
+                    )
+
+            # Add text content if it exists
+            if prompt.prompt:
+                user_content.append({"type": "text", "text": prompt.prompt})
+
+            # Add the user message if we have content
+            if user_content:
+                messages.append({"role": "user", "content": user_content})
+
+            # Handle cache control for messages without attachments
+            elif prompt.options.cache and messages:
+                last_message = messages[-1]
+                if isinstance(last_message.get("content"), list):
+                    last_message["content"][-1]["cache_control"] = {
+                        "type": "ephemeral"
                     }
-                )
-
-            # Add cache control if needed
-            if prompt.options.cache and user_content:
-                user_content[-1]["cache_control"] = {"type": "ephemeral"}
-
-        # Add current prompt's tool results
-        if prompt.tool_results:
-            for tool_result in prompt.tool_results:
-                user_content.append(
-                    {
-                        "type": "tool_result",
-                        "tool_use_id": tool_result.tool_call_id,
-                        "content": tool_result.output,
-                    }
-                )
-
-        # Add text content if it exists
-        if prompt.prompt:
-            user_content.append({"type": "text", "text": prompt.prompt})
-
-        # Add the user message if we have content
-        if user_content:
-            messages.append({"role": "user", "content": user_content})
-
-        # Handle cache control for messages without attachments
-        elif prompt.options.cache and messages:
-            last_message = messages[-1]
-            if isinstance(last_message.get("content"), list):
-                last_message["content"][-1]["cache_control"] = {"type": "ephemeral"}
-            else:
-                # This should not happen with our new structure, but keeping as a fallback
-                last_message["cache_control"] = {"type": "ephemeral"}
+                else:
+                    last_message["cache_control"] = {"type": "ephemeral"}
 
         # Add prefill if specified
         if prompt.options.prefill:
