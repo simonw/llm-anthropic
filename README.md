@@ -218,6 +218,14 @@ cog.out("".join(output))
 
     Number of tokens to budget for thinking
 
+- **thinking_display**: `boolean`
+
+    Request summarized thinking output (available in --json logs)
+
+- **thinking_adaptive**: `boolean`
+
+    Force adaptive thinking mode (sends thinking={"type": "adaptive"})
+
 <!-- [[[end]]] -->
 
 The `prefill` option can be used to set the first part of the response. To increase the chance of returning JSON, set that to `{`:

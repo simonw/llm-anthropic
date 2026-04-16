@@ -469,6 +469,14 @@ class ClaudeOptionsWithThinking(ClaudeOptions):
     thinking_budget: int | None = Field(
         description="Number of tokens to budget for thinking", default=None
     )
+    thinking_display: bool | None = Field(
+        description="Request summarized thinking output (available in --json logs)",
+        default=None,
+    )
+    thinking_adaptive: bool | None = Field(
+        description='Force adaptive thinking mode (sends thinking={"type": "adaptive"})',
+        default=None,
+    )
 
 
 class ClaudeOptionsWithThinkingEffort(ClaudeOptionsWithThinking):
@@ -749,15 +757,18 @@ class _Shared:
         thinking_requested = False
         if self.supports_thinking:
             thinking_requested = (
-                prompt.options.thinking or prompt.options.thinking_budget
+                prompt.options.thinking
+                or prompt.options.thinking_budget
+                or prompt.options.thinking_display
+                or prompt.options.thinking_adaptive
+                or thinking_effort_enabled
             )
-            # If thinking_effort is provided, thinking should be enabled
-            if thinking_effort_enabled:
-                thinking_requested = True
 
         if self.supports_thinking and thinking_requested:
             prompt.options.thinking = True
-            if prompt.options.thinking_budget:
+            if prompt.options.thinking_adaptive or thinking_effort_enabled:
+                kwargs["thinking"] = {"type": "adaptive"}
+            elif prompt.options.thinking_budget:
                 # Explicit budget = manual mode (deprecated on 4.6 but still works)
                 kwargs["thinking"] = {
                     "type": "enabled",
@@ -773,6 +784,9 @@ class _Shared:
                     "type": "enabled",
                     "budget_tokens": budget_tokens,
                 }
+
+            if prompt.options.thinking_display:
+                kwargs["thinking"]["display"] = "summarized"
 
         # Handle effort in output_config
         if thinking_effort_enabled:
