@@ -25,6 +25,7 @@ def test_prompt():
     assert str(response) == "- Captain\n- Scoop"
     response_dict = dict(response.response_json)
     response_dict.pop("id")  # differs between requests
+    response_dict.pop("stop_details", None)  # added in anthropic>=0.96
     assert response_dict == {
         "container": None,
         "content": [
@@ -56,6 +57,7 @@ async def test_async_prompt():
     assert await response.text() == "- Captain\n- Scoop"
     response_dict = dict(response.response_json)
     response_dict.pop("id")  # differs between requests
+    response_dict.pop("stop_details", None)
     assert response_dict == {
         "container": None,
         "content": [
@@ -93,6 +95,7 @@ def test_image_prompt():
     assert str(response) == EXPECTED_IMAGE_TEXT
     response_dict = response.response_json
     response_dict.pop("id")  # differs between requests
+    response_dict.pop("stop_details", None)
     assert response_dict == {
         "container": None,
         "content": [
@@ -238,6 +241,7 @@ def test_thinking_prompt():
     assert response.text() == "- Captain\n- Scoop"
     response_dict = dict(response.response_json)
     response_dict.pop("id")  # differs between requests
+    response_dict.pop("stop_details", None)
     assert response_dict == {
         "container": None,
         "content": [
