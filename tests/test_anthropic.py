@@ -419,7 +419,7 @@ def test_parts_thinking():
     model.key = model.key or ANTHROPIC_API_KEY
     response = model.prompt("Two names for a pet pelican, be brief", thinking=True)
     response.text()
-    parts = response.parts
+    parts = [p for m in response.messages for p in m.parts]
     reasoning_parts = [p for p in parts if isinstance(p, ReasoningPart)]
     text_parts = [p for p in parts if isinstance(p, TextPart)]
     assert len(reasoning_parts) >= 1, "Should have reasoning part"
@@ -479,10 +479,144 @@ def test_web_search_tool_result_ordering():
     )
 
     # Also verify via parts
-    parts = response.parts
+    parts = [p for m in response.messages for p in m.parts]
     part_types = [type(p).__name__ for p in parts]
     # ToolResultPart should appear before the main TextParts
     if "ToolResultPart" in part_types and "TextPart" in part_types:
         first_result_idx = part_types.index("ToolResultPart")
         first_text_idx = part_types.index("TextPart")
         assert first_result_idx < first_text_idx
+
+
+# --- messages= parameter --------------------------------------------------
+#
+# Unit tests that exercise build_messages directly on messages= input.
+# Pure structural — no API calls, so no cassettes.
+
+def _build_messages_for(prompt_kwargs):
+    """Invoke build_messages on a one-shot Prompt without hitting the API."""
+    model = llm.get_model("claude-sonnet-4.5")
+    options = prompt_kwargs.pop("options", model.Options())
+    p = llm.Prompt(None, model=model, options=options, **prompt_kwargs)
+    return model.build_messages(p, None)
+
+
+def test_build_messages_simple_user_text():
+    from llm import user
+    msgs = _build_messages_for({"messages": [user("hi")]})
+    assert msgs == [{"role": "user", "content": [{"type": "text", "text": "hi"}]}]
+
+
+def test_build_messages_skips_system_role():
+    from llm import system, user
+    msgs = _build_messages_for({"messages": [system("be nice"), user("hi")]})
+    # System does not appear in the messages list; it goes to kwargs["system"].
+    assert msgs == [{"role": "user", "content": [{"type": "text", "text": "hi"}]}]
+
+
+def test_build_messages_merges_tool_then_user():
+    """A tool-role message followed by a user message must collapse into one
+    Anthropic user turn (tool_result + text in the same content array)."""
+    from llm import user, tool_message
+    from llm.parts import ToolResultPart
+    msgs = _build_messages_for(
+        {
+            "messages": [
+                tool_message(
+                    ToolResultPart(
+                        name="search", output="sunny", tool_call_id="call_1"
+                    )
+                ),
+                user("thanks"),
+            ]
+        }
+    )
+    assert msgs == [
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "tool_result",
+                    "tool_use_id": "call_1",
+                    "content": "sunny",
+                },
+                {"type": "text", "text": "thanks"},
+            ],
+        }
+    ]
+
+
+def test_build_messages_assistant_tool_call_and_text():
+    from llm import assistant, user
+    from llm.parts import TextPart, ToolCallPart
+    msgs = _build_messages_for(
+        {
+            "messages": [
+                user("what time?"),
+                assistant(
+                    TextPart(text="Let me check"),
+                    ToolCallPart(name="clock", arguments={}, tool_call_id="c1"),
+                ),
+            ]
+        }
+    )
+    assert msgs == [
+        {"role": "user", "content": [{"type": "text", "text": "what time?"}]},
+        {
+            "role": "assistant",
+            "content": [
+                {"type": "text", "text": "Let me check"},
+                {
+                    "type": "tool_use",
+                    "id": "c1",
+                    "name": "clock",
+                    "input": {},
+                },
+            ],
+        },
+    ]
+
+
+def test_build_messages_reasoning_round_trips_signature():
+    """Thinking blocks from a prior assistant message must preserve the
+    Anthropic signature via provider_metadata — otherwise continuation
+    requests involving signed thinking get rejected by the API."""
+    from llm import assistant, user
+    from llm.parts import ReasoningPart, TextPart
+    msgs = _build_messages_for(
+        {
+            "messages": [
+                user("q"),
+                assistant(
+                    ReasoningPart(
+                        text="thinking...",
+                        provider_metadata={"anthropic": {"signature": "sig-abc"}},
+                    ),
+                    TextPart(text="answer"),
+                ),
+            ]
+        }
+    )
+    assert msgs[1]["content"][0] == {
+        "type": "thinking",
+        "thinking": "thinking...",
+        "signature": "sig-abc",
+    }
+
+
+def test_extract_system_from_messages():
+    from llm import system, user
+    model = llm.get_model("claude-sonnet-4.5")
+    p = llm.Prompt(
+        None, model=model, messages=[system("be helpful"), user("hi")]
+    )
+    assert model._extract_system(p) == "be helpful"
+
+
+def test_extract_system_prefers_prompt_system_over_messages():
+    """When both paths are populated (synthesized case), prompt.system wins
+    since it already composes system= + system_fragments."""
+    from llm import user
+    model = llm.get_model("claude-sonnet-4.5")
+    p = llm.Prompt(None, model=model, system="legacy sys", messages=[user("hi")])
+    assert model._extract_system(p) == "legacy sys"

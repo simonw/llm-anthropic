@@ -1,9 +1,17 @@
 from anthropic import Anthropic, AsyncAnthropic, transform_schema
 import enum
 import llm
-from llm.parts import StreamEvent
+from llm.parts import (
+    AttachmentPart,
+    Message,
+    ReasoningPart,
+    StreamEvent,
+    TextPart,
+    ToolCallPart,
+    ToolResultPart,
+)
 import json
-from typing import Optional, List
+from typing import Any, Dict, Optional, List
 from pydantic import Field, field_validator, model_validator
 
 DEFAULT_THINKING_TOKENS = 1024
@@ -15,6 +23,7 @@ class ThinkingEffort(str, enum.Enum):
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
+    XHIGH = "xhigh"
     MAX = "max"
 
 
@@ -276,7 +285,30 @@ def register_models(register):
         ),
         aliases=("claude-sonnet-4.6",),
     )
-
+    # claude-opus-4-7
+    register(
+        ClaudeMessages(
+            "claude-opus-4-7",
+            supports_pdf=True,
+            supports_thinking=True,
+            supports_thinking_effort=True,
+            supports_adaptive_thinking=True,
+            supports_web_search=True,
+            use_structured_outputs=True,
+            default_max_tokens=8192,
+        ),
+        AsyncClaudeMessages(
+            "claude-opus-4-7",
+            supports_pdf=True,
+            supports_thinking=True,
+            supports_thinking_effort=True,
+            supports_adaptive_thinking=True,
+            supports_web_search=True,
+            use_structured_outputs=True,
+            default_max_tokens=8192,
+        ),
+        aliases=("claude-opus-4.7",),
+    )
 
 class ClaudeOptions(llm.Options):
     max_tokens: int | None = Field(
@@ -446,6 +478,14 @@ class ClaudeOptionsWithThinking(ClaudeOptions):
     thinking_budget: int | None = Field(
         description="Number of tokens to budget for thinking", default=None
     )
+    thinking_display: bool | None = Field(
+        description="Request summarized thinking output (sends display='summarized')",
+        default=None,
+    )
+    thinking_adaptive: bool | None = Field(
+        description="Force adaptive thinking mode (sends thinking={'type': 'adaptive'})",
+        default=None,
+    )
 
 
 class ClaudeOptionsWithThinkingEffort(ClaudeOptionsWithThinking):
@@ -547,156 +587,159 @@ class _Shared:
             warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
             return message.model_dump()
 
-    def build_messages(self, prompt, conversation) -> list[dict]:
-        messages = []
+    # --- messages= support -------------------------------------------------
+    #
+    # This plugin consumes prompt.messages (the canonical list[Message]
+    # that llm synthesizes from legacy inputs when messages= wasn't
+    # explicitly passed). Each Message + its Parts is translated into
+    # Anthropic content blocks; adjacent user-side messages (role="user"
+    # or role="tool") are merged because Anthropic requires alternating
+    # user/assistant turns.
 
-        # Process existing conversation history
-        if conversation:
-            for response in conversation.responses:
-                # Build user message
-                user_content = []
+    def _part_to_block(self, part) -> Optional[Dict[str, Any]]:
+        """Translate one llm Part into an Anthropic content block."""
+        pm = getattr(part, "provider_metadata", None) or {}
+        anthropic_pm = pm.get("anthropic", {}) if isinstance(pm, dict) else {}
+        if isinstance(part, TextPart):
+            block: Dict[str, Any] = {"type": "text", "text": part.text}
+            return block
+        if isinstance(part, ReasoningPart):
+            block = {"type": "thinking", "thinking": part.text}
+            # Anthropic signed-thinking requires the signature echoed back.
+            sig = anthropic_pm.get("signature") if isinstance(anthropic_pm, dict) else None
+            if sig:
+                block["signature"] = sig
+            return block
+        if isinstance(part, ToolCallPart):
+            return {
+                "type": "tool_use",
+                "id": part.tool_call_id,
+                "name": part.name,
+                "input": part.arguments,
+            }
+        if isinstance(part, ToolResultPart):
+            return {
+                "type": "tool_result",
+                "tool_use_id": part.tool_call_id,
+                "content": part.output,
+            }
+        if isinstance(part, AttachmentPart) and part.attachment is not None:
+            attachment = part.attachment
+            attachment_type = (
+                "document"
+                if attachment.resolve_type() == "application/pdf"
+                else "image"
+            )
+            return {
+                "type": attachment_type,
+                "source": source_for_attachment(attachment),
+            }
+        return None
 
-                # Handle attachments in user message
-                if response.attachments:
-                    for attachment in response.attachments:
-                        attachment_type = (
-                            "document"
-                            if attachment.resolve_type() == "application/pdf"
-                            else "image"
-                        )
-                        user_content.append(
-                            {
-                                "type": attachment_type,
-                                "source": source_for_attachment(attachment),
-                            }
-                        )
+    def _message_to_blocks(self, message: Message) -> List[Dict[str, Any]]:
+        blocks: List[Dict[str, Any]] = []
+        for part in message.parts:
+            block = self._part_to_block(part)
+            if block is not None:
+                blocks.append(block)
+        return blocks
 
-                # Add text content if it exists
-                if response.prompt.prompt:
-                    user_content.append(
-                        {"type": "text", "text": response.prompt.prompt}
-                    )
-
-                # Handle tool results if present (add to the same user message)
-                if response.prompt.tool_results:
-                    for tool_result in response.prompt.tool_results:
-                        user_content.append(
-                            {
-                                "type": "tool_result",
-                                "tool_use_id": tool_result.tool_call_id,
-                                "content": tool_result.output,
-                            }
-                        )
-
-                # Only add the message if we have content
-                if user_content:
-                    messages.append({"role": "user", "content": user_content})
-
-                # Build assistant message
-                assistant_content = []
-                text_content = response.text_or_raise()
-
-                # Add text content if it exists
-                if text_content:
-                    assistant_content.append({"type": "text", "text": text_content})
-
-                # Add tool calls if they exist
-                tool_calls = response.tool_calls_or_raise()
-                for tool_call in tool_calls:
-                    assistant_content.append(
-                        {
-                            "type": "tool_use",
-                            "id": tool_call.tool_call_id,
-                            "name": tool_call.name,
-                            "input": tool_call.arguments,
-                        }
-                    )
-
-                # Add assistant message if we have content
-                if assistant_content:
-                    messages.append({"role": "assistant", "content": assistant_content})
-
-        # If parts= was provided, use those directly
-        if prompt._parts:
-            from llm.parts import TextPart
-
-            current_role = None
-            current_content = []
-            for part in prompt._parts:
-                if isinstance(part, TextPart):
-                    if part.role != current_role:
-                        if current_content:
-                            messages.append(
-                                {"role": current_role, "content": current_content}
-                            )
-                        current_role = part.role
-                        current_content = []
-                    current_content.append({"type": "text", "text": part.text})
-            if current_content:
-                messages.append({"role": current_role, "content": current_content})
+    def _append_message(
+        self, out: List[Dict[str, Any]], message: Message
+    ) -> None:
+        """Append an Anthropic-shaped message, merging with the previous one
+        if both would be user-side turns (tool_result + text in the same
+        user message is the required shape for tool follow-ups)."""
+        if message.role == "system":
+            return  # system lives on the top-level kwargs["system"] field
+        blocks = self._message_to_blocks(message)
+        if not blocks:
+            return
+        # Anthropic: tool messages from llm become user messages with
+        # tool_result blocks; assistant stays assistant.
+        anthropic_role = "assistant" if message.role == "assistant" else "user"
+        if out and out[-1]["role"] == anthropic_role and anthropic_role == "user":
+            out[-1]["content"].extend(blocks)
         else:
-            # Handle current prompt's tool results and user content together
-            user_content = []
+            out.append({"role": anthropic_role, "content": blocks})
 
-            # Add attachments
-            if prompt.attachments:
-                for attachment in prompt.attachments:
-                    attachment_type = (
-                        "document"
-                        if attachment.resolve_type() == "application/pdf"
-                        else "image"
-                    )
-                    user_content.append(
-                        {
-                            "type": attachment_type,
-                            "source": source_for_attachment(attachment),
-                        }
-                    )
+    def _append_prev_response_output(
+        self, out: List[Dict[str, Any]], prev_response
+    ) -> None:
+        """Add the assistant turn from a previous Response. Mirrors the
+        flat text+tool_calls pattern used by the OpenAI plugin."""
+        assistant_content: List[Dict[str, Any]] = []
+        text_content = prev_response.text_or_raise()
+        if text_content:
+            assistant_content.append({"type": "text", "text": text_content})
+        for tool_call in prev_response.tool_calls_or_raise():
+            assistant_content.append(
+                {
+                    "type": "tool_use",
+                    "id": tool_call.tool_call_id,
+                    "name": tool_call.name,
+                    "input": tool_call.arguments,
+                }
+            )
+        if assistant_content:
+            out.append({"role": "assistant", "content": assistant_content})
 
-                # Add cache control if needed
-                if prompt.options.cache and user_content:
-                    user_content[-1]["cache_control"] = {"type": "ephemeral"}
+    def build_messages(self, prompt, conversation) -> list[dict]:
+        messages: List[Dict[str, Any]] = []
 
-            # Add current prompt's tool results
-            if prompt.tool_results:
-                for tool_result in prompt.tool_results:
-                    user_content.append(
-                        {
-                            "type": "tool_result",
-                            "tool_use_id": tool_result.tool_call_id,
-                            "content": tool_result.output,
-                        }
-                    )
+        if conversation:
+            for prev_response in conversation.responses:
+                # Input side: emit each Message on prev_response.prompt.messages
+                for message in prev_response.prompt.messages:
+                    self._append_message(messages, message)
+                # Output side: reconstruct the assistant turn
+                self._append_prev_response_output(messages, prev_response)
 
-            # Add text content if it exists
-            if prompt.prompt:
-                user_content.append({"type": "text", "text": prompt.prompt})
+        # Current turn — iterate prompt.messages (auto-synthesized from
+        # legacy inputs if messages= was not explicitly passed).
+        for message in prompt.messages:
+            self._append_message(messages, message)
 
-            # Add the user message if we have content
-            if user_content:
-                messages.append({"role": "user", "content": user_content})
+        # Cache control: apply to the last content block of the final
+        # user-side turn, matching the pre-upgrade behavior.
+        if prompt.options.cache and messages:
+            last_message = messages[-1]
+            if isinstance(last_message.get("content"), list) and last_message["content"]:
+                last_message["content"][-1]["cache_control"] = {
+                    "type": "ephemeral"
+                }
 
-            # Handle cache control for messages without attachments
-            elif prompt.options.cache and messages:
-                last_message = messages[-1]
-                if isinstance(last_message.get("content"), list):
-                    last_message["content"][-1]["cache_control"] = {
-                        "type": "ephemeral"
-                    }
-                else:
-                    last_message["cache_control"] = {"type": "ephemeral"}
-
-        # Add prefill if specified
+        # Prefill — append an assistant turn the model will continue from.
         if prompt.options.prefill:
             if self.supports_adaptive_thinking:
                 raise ValueError(
                     f"Prefilling assistant messages is not supported by {self.claude_model_id}. "
                     f"Use structured outputs or system prompt instructions instead."
                 )
-            prefill_content = [{"type": "text", "text": prompt.options.prefill}]
-            messages.append({"role": "assistant", "content": prefill_content})
+            messages.append(
+                {
+                    "role": "assistant",
+                    "content": [{"type": "text", "text": prompt.options.prefill}],
+                }
+            )
 
         return messages
+
+    def _extract_system(self, prompt) -> Optional[str]:
+        """Pull the system prompt from prompt.messages or prompt.system.
+
+        ``prompt.system`` already composes ``_system`` + ``system_fragments``;
+        if messages= was passed explicitly and it contains a system-role
+        message, fall back to reading that.
+        """
+        if prompt.system:
+            return prompt.system
+        for message in prompt.messages:
+            if message.role == "system":
+                texts = [p.text for p in message.parts if isinstance(p, TextPart)]
+                if texts:
+                    return "\n\n".join(texts)
+        return None
 
     def build_kwargs(self, prompt, conversation):
         if prompt.schema and prompt.tools:
@@ -732,8 +775,9 @@ class _Shared:
         if prompt.options.top_k:
             kwargs["top_k"] = prompt.options.top_k
 
-        if prompt.system:
-            kwargs["system"] = prompt.system
+        system = self._extract_system(prompt)
+        if system:
+            kwargs["system"] = system
 
         if prompt.options.stop_sequences:
             kwargs["stop_sequences"] = prompt.options.stop_sequences
@@ -745,14 +789,21 @@ class _Shared:
         # Determine if thinking should be activated
         thinking_requested = False
         if self.supports_thinking:
-            thinking_requested = prompt.options.thinking or prompt.options.thinking_budget
-            # On pre-GA effort models (Opus 4.5), effort implies thinking
-            if thinking_effort_enabled and not self.supports_adaptive_thinking:
+            thinking_requested = (
+                prompt.options.thinking
+                or prompt.options.thinking_budget
+                or prompt.options.thinking_display
+                or prompt.options.thinking_adaptive
+            )
+            # thinking_effort implies thinking (both adaptive 4.6+ and pre-GA 4.5)
+            if thinking_effort_enabled:
                 thinking_requested = True
 
         if self.supports_thinking and thinking_requested:
             prompt.options.thinking = True
-            if prompt.options.thinking_budget:
+            if prompt.options.thinking_adaptive or thinking_effort_enabled:
+                kwargs["thinking"] = {"type": "adaptive"}
+            elif prompt.options.thinking_budget:
                 # Explicit budget = manual mode (deprecated on 4.6 but still works)
                 kwargs["thinking"] = {
                     "type": "enabled",
@@ -768,6 +819,9 @@ class _Shared:
                     "type": "enabled",
                     "budget_tokens": budget_tokens,
                 }
+
+            if prompt.options.thinking_display:
+                kwargs["thinking"]["display"] = "summarized"
 
         # Handle effort in output_config
         if thinking_effort_enabled:
