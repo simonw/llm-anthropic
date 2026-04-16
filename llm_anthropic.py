@@ -197,13 +197,13 @@ def register_models(register):
             "claude-haiku-4-5-20251001",
             supports_pdf=True,
             supports_thinking=True,
-            default_max_tokens=8192,
+            default_max_tokens=64000,
         ),
         AsyncClaudeMessages(
             "claude-haiku-4-5-20251001",
             supports_pdf=True,
             supports_thinking=True,
-            default_max_tokens=8192,
+            default_max_tokens=64000,
         ),
         aliases=("claude-haiku-4.5",),
     )
@@ -261,7 +261,7 @@ def register_models(register):
             supports_adaptive_thinking=True,
             supports_web_search=True,
             use_structured_outputs=True,
-            default_max_tokens=8192,
+            default_max_tokens=64000,
         ),
         AsyncClaudeMessages(
             "claude-sonnet-4-6",
@@ -271,7 +271,7 @@ def register_models(register):
             supports_adaptive_thinking=True,
             supports_web_search=True,
             use_structured_outputs=True,
-            default_max_tokens=8192,
+            default_max_tokens=64000,
         ),
         aliases=("claude-sonnet-4.6",),
     )
@@ -285,7 +285,7 @@ def register_models(register):
             supports_adaptive_thinking=True,
             supports_web_search=True,
             use_structured_outputs=True,
-            default_max_tokens=8192,
+            default_max_tokens=128000,
         ),
         AsyncClaudeMessages(
             "claude-opus-4-7",
@@ -295,7 +295,7 @@ def register_models(register):
             supports_adaptive_thinking=True,
             supports_web_search=True,
             use_structured_outputs=True,
-            default_max_tokens=8192,
+            default_max_tokens=128000,
         ),
         aliases=("claude-opus-4.7",),
     )
