@@ -27,10 +27,16 @@ def test_prompt():
     response_dict.pop("id")  # differs between requests
     assert response_dict == {
         "container": None,
-        "content": [{"citations": None, "parsed_output": None, "text": "- Captain\n- Scoop", "type": "text"}],
+        "content": [
+            {
+                "citations": None,
+                "parsed_output": None,
+                "text": "- Captain\n- Scoop",
+                "type": "text",
+            }
+        ],
         "model": "claude-sonnet-4-5-20250929",
         "role": "assistant",
-        "stop_details": None,
         "stop_reason": "end_turn",
         "stop_sequence": None,
         "type": "message",
@@ -52,10 +58,16 @@ async def test_async_prompt():
     response_dict.pop("id")  # differs between requests
     assert response_dict == {
         "container": None,
-        "content": [{"citations": None, "parsed_output": None, "text": "- Captain\n- Scoop", "type": "text"}],
+        "content": [
+            {
+                "citations": None,
+                "parsed_output": None,
+                "text": "- Captain\n- Scoop",
+                "type": "text",
+            }
+        ],
         "model": "claude-sonnet-4-5-20250929",
         "role": "assistant",
-        "stop_details": None,
         "stop_reason": "end_turn",
         "stop_sequence": None,
         "type": "message",
@@ -83,10 +95,16 @@ def test_image_prompt():
     response_dict.pop("id")  # differs between requests
     assert response_dict == {
         "container": None,
-        "content": [{"citations": None, "parsed_output": None, "text": EXPECTED_IMAGE_TEXT, "type": "text"}],
+        "content": [
+            {
+                "citations": None,
+                "parsed_output": None,
+                "text": EXPECTED_IMAGE_TEXT,
+                "type": "text",
+            }
+        ],
         "model": "claude-sonnet-4-5-20250929",
         "role": "assistant",
-        "stop_details": None,
         "stop_reason": "end_turn",
         "stop_sequence": None,
         "type": "message",
@@ -228,11 +246,15 @@ def test_thinking_prompt():
                 "thinking": "The user wants two names for a pet pelican, and wants me to be brief. I'll give two simple, fitting names.\n\nSome options:\n- Pete\n- Percy\n- Captain\n- Scoop\n- Bill\n- Gully\n\nI'll pick two good ones and keep it very short.",
                 "type": "thinking",
             },
-            {"citations": None, "parsed_output": None, "text": "- Captain\n- Scoop", "type": "text"},
+            {
+                "citations": None,
+                "parsed_output": None,
+                "text": "- Captain\n- Scoop",
+                "type": "text",
+            },
         ],
         "model": "claude-sonnet-4-5-20250929",
         "role": "assistant",
-        "stop_details": None,
         "stop_reason": "end_turn",
         "stop_sequence": None,
         "type": "message",
@@ -317,9 +339,7 @@ def test_sonnet_46_prompt():
 def test_opus_46_adaptive_thinking():
     model = llm.get_model("claude-opus-4.6")
     model.key = model.key or ANTHROPIC_API_KEY
-    response = model.prompt(
-        "Two names for a pet pelican, be brief", thinking=True
-    )
+    response = model.prompt("Two names for a pet pelican, be brief", thinking=True)
     text = response.text()
     assert len(text) > 0
     response_dict = dict(response.response_json)
@@ -343,7 +363,9 @@ def test_sonnet_46_effort_without_thinking():
 def test_46_prefill_rejected():
     model = llm.get_model("claude-opus-4.6")
     model.key = "test-key"
-    with pytest.raises(ValueError, match="Prefilling assistant messages is not supported"):
+    with pytest.raises(
+        ValueError, match="Prefilling assistant messages is not supported"
+    ):
         model.prompt("Hello", prefill="{").text()
 
 

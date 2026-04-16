@@ -9,11 +9,11 @@ DEFAULT_THINKING_TOKENS = 1024
 DEFAULT_TEMPERATURE = 1.0
 
 
-# Thinking effort enum, string, low, medium or high
 class ThinkingEffort(str, enum.Enum):
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
+    XHIGH = "xhigh"
     MAX = "max"
 
 
@@ -274,6 +274,30 @@ def register_models(register):
             default_max_tokens=8192,
         ),
         aliases=("claude-sonnet-4.6",),
+    )
+    # claude-opus-4-7
+    register(
+        ClaudeMessages(
+            "claude-opus-4-7",
+            supports_pdf=True,
+            supports_thinking=True,
+            supports_thinking_effort=True,
+            supports_adaptive_thinking=True,
+            supports_web_search=True,
+            use_structured_outputs=True,
+            default_max_tokens=8192,
+        ),
+        AsyncClaudeMessages(
+            "claude-opus-4-7",
+            supports_pdf=True,
+            supports_thinking=True,
+            supports_thinking_effort=True,
+            supports_adaptive_thinking=True,
+            supports_web_search=True,
+            use_structured_outputs=True,
+            default_max_tokens=8192,
+        ),
+        aliases=("claude-opus-4.7",),
     )
 
 
@@ -724,9 +748,11 @@ class _Shared:
         # Determine if thinking should be activated
         thinking_requested = False
         if self.supports_thinking:
-            thinking_requested = prompt.options.thinking or prompt.options.thinking_budget
-            # On pre-GA effort models (Opus 4.5), effort implies thinking
-            if thinking_effort_enabled and not self.supports_adaptive_thinking:
+            thinking_requested = (
+                prompt.options.thinking or prompt.options.thinking_budget
+            )
+            # If thinking_effort is provided, thinking should be enabled
+            if thinking_effort_enabled:
                 thinking_requested = True
 
         if self.supports_thinking and thinking_requested:
@@ -752,15 +778,14 @@ class _Shared:
         if thinking_effort_enabled:
             if prompt.options.thinking_effort == ThinkingEffort.MAX:
                 if not (
-                    self.supports_adaptive_thinking
-                    and "opus" in self.claude_model_id
+                    self.supports_adaptive_thinking and "opus" in self.claude_model_id
                 ):
                     raise ValueError(
                         "thinking_effort='max' is only supported by claude-opus-4-6"
                     )
-            kwargs.setdefault("output_config", {})["effort"] = (
-                prompt.options.thinking_effort.value
-            )
+            kwargs.setdefault("output_config", {})[
+                "effort"
+            ] = prompt.options.thinking_effort.value
 
         max_tokens = self.default_max_tokens
         if prompt.options.max_tokens is not None:
