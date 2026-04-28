@@ -333,9 +333,7 @@ def test_sonnet_46_prompt():
 def test_opus_46_adaptive_thinking():
     model = llm.get_model("claude-opus-4.6")
     model.key = model.key or ANTHROPIC_API_KEY
-    response = model.prompt(
-        "Two names for a pet pelican, be brief", thinking=True
-    )
+    response = model.prompt("Two names for a pet pelican, be brief", thinking=True)
     text = response.text()
     assert len(text) > 0
     response_dict = dict(response.response_json)
@@ -359,7 +357,9 @@ def test_sonnet_46_effort_without_thinking():
 def test_46_prefill_rejected():
     model = llm.get_model("claude-opus-4.6")
     model.key = "test-key"
-    with pytest.raises(ValueError, match="Prefilling assistant messages is not supported"):
+    with pytest.raises(
+        ValueError, match="Prefilling assistant messages is not supported"
+    ):
         model.prompt("Hello", prefill="{").text()
 
 
@@ -460,11 +460,10 @@ def test_web_search_tool_result_ordering():
     events = list(response.stream_events())
 
     # Find indices of first tool_result and first text event
-    tool_result_indices = [
-        i for i, e in enumerate(events) if e.type == "tool_result"
-    ]
+    tool_result_indices = [i for i, e in enumerate(events) if e.type == "tool_result"]
     text_indices = [
-        i for i, e in enumerate(events)
+        i
+        for i, e in enumerate(events)
         if e.type == "text" and e.chunk.strip()  # non-empty text
     ]
     assert len(tool_result_indices) >= 1, "Should have tool_result events"
@@ -493,6 +492,7 @@ def test_web_search_tool_result_ordering():
 # Unit tests that exercise build_messages directly on messages= input.
 # Pure structural — no API calls, so no cassettes.
 
+
 def _build_messages_for(prompt_kwargs):
     """Invoke build_messages on a one-shot Prompt without hitting the API."""
     model = llm.get_model("claude-sonnet-4.5")
@@ -503,12 +503,14 @@ def _build_messages_for(prompt_kwargs):
 
 def test_build_messages_simple_user_text():
     from llm import user
+
     msgs = _build_messages_for({"messages": [user("hi")]})
     assert msgs == [{"role": "user", "content": [{"type": "text", "text": "hi"}]}]
 
 
 def test_build_messages_skips_system_role():
     from llm import system, user
+
     msgs = _build_messages_for({"messages": [system("be nice"), user("hi")]})
     # System does not appear in the messages list; it goes to kwargs["system"].
     assert msgs == [{"role": "user", "content": [{"type": "text", "text": "hi"}]}]
@@ -519,13 +521,12 @@ def test_build_messages_merges_tool_then_user():
     Anthropic user turn (tool_result + text in the same content array)."""
     from llm import user, tool_message
     from llm.parts import ToolResultPart
+
     msgs = _build_messages_for(
         {
             "messages": [
                 tool_message(
-                    ToolResultPart(
-                        name="search", output="sunny", tool_call_id="call_1"
-                    )
+                    ToolResultPart(name="search", output="sunny", tool_call_id="call_1")
                 ),
                 user("thanks"),
             ]
@@ -549,6 +550,7 @@ def test_build_messages_merges_tool_then_user():
 def test_build_messages_assistant_tool_call_and_text():
     from llm import assistant, user
     from llm.parts import TextPart, ToolCallPart
+
     msgs = _build_messages_for(
         {
             "messages": [
@@ -583,6 +585,7 @@ def test_build_messages_reasoning_round_trips_signature():
     requests involving signed thinking get rejected by the API."""
     from llm import assistant, user
     from llm.parts import ReasoningPart, TextPart
+
     msgs = _build_messages_for(
         {
             "messages": [
@@ -606,10 +609,9 @@ def test_build_messages_reasoning_round_trips_signature():
 
 def test_extract_system_from_messages():
     from llm import system, user
+
     model = llm.get_model("claude-sonnet-4.5")
-    p = llm.Prompt(
-        None, model=model, messages=[system("be helpful"), user("hi")]
-    )
+    p = llm.Prompt(None, model=model, messages=[system("be helpful"), user("hi")])
     assert model._extract_system(p) == "be helpful"
 
 
@@ -617,6 +619,7 @@ def test_extract_system_prefers_prompt_system_over_messages():
     """When both paths are populated (synthesized case), prompt.system wins
     since it already composes system= + system_fragments."""
     from llm import user
+
     model = llm.get_model("claude-sonnet-4.5")
     p = llm.Prompt(None, model=model, system="legacy sys", messages=[user("hi")])
     assert model._extract_system(p) == "legacy sys"
