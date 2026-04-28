@@ -22,7 +22,7 @@ CI = "https://github.com/simonw/llm-anthropic/actions"
 anthropic = "llm_anthropic"
 
 [dependency-groups]
-dev = ["pytest", "pytest-recording", "pytest-asyncio", "cogapp", "inline-snapshot"]
+dev = ["pytest", "pytest-recording", "pytest-asyncio", "cogapp", "inline-snapshot[black]"]
 
 [tool.uv]
 package = true
