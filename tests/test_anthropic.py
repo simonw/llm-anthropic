@@ -286,6 +286,35 @@ def test_tools():
 
 
 @pytest.mark.vcr
+def test_llm_version_tool_chain_regression():
+    model = llm.get_model("claude-haiku-4.5")
+    from llm.tools import llm_version
+
+    chain_response = model.chain(
+        "Use the llm_version tool. Then tell me the version and make one short joke about it.",
+        tools=[llm_version],
+        key=ANTHROPIC_API_KEY,
+    )
+    text = chain_response.text()
+    assert llm_version() in text
+    assert len(chain_response._responses) == 2
+    second_response = chain_response._responses[1]
+    assert second_response.prompt.tool_results[0].output == llm_version()
+    second_request_messages = model.build_messages(
+        second_response.prompt, second_response.conversation
+    )
+    assert [message["role"] for message in second_request_messages] == [
+        "user",
+        "assistant",
+        "user",
+    ]
+    assert second_request_messages[1]["content"][-1]["type"] == "tool_use"
+    assert [block["type"] for block in second_request_messages[2]["content"]] == [
+        "tool_result"
+    ]
+
+
+@pytest.mark.vcr
 def test_web_search():
     model = llm.get_model("claude-opus-4.1")
     model.key = model.key or ANTHROPIC_API_KEY

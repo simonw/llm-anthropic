@@ -646,6 +646,25 @@ class _Shared:
             block = self._part_to_block(part)
             if block is not None:
                 blocks.append(block)
+        if message.role == "assistant":
+            filtered_blocks: List[Dict[str, Any]] = []
+            seen_tool_use = False
+            for block in blocks:
+                block_type = block.get("type")
+                if (
+                    seen_tool_use
+                    and block_type == "text"
+                    and block.get("text") == " "
+                ):
+                    # The sync streaming path yields a display-only space
+                    # after tool calls so chained text does not run together.
+                    # Anthropic rejects assistant history that places text
+                    # after tool_use instead of immediately before tool_result.
+                    continue
+                filtered_blocks.append(block)
+                if block_type == "tool_use":
+                    seen_tool_use = True
+            blocks = filtered_blocks
         return blocks
 
     def _append_message(self, out: List[Dict[str, Any]], message: Message) -> None:
@@ -689,16 +708,11 @@ class _Shared:
     def build_messages(self, prompt, conversation) -> list[dict]:
         messages: List[Dict[str, Any]] = []
 
-        if conversation:
-            for prev_response in conversation.responses:
-                # Input side: emit each Message on prev_response.prompt.messages
-                for message in prev_response.prompt.messages:
-                    self._append_message(messages, message)
-                # Output side: reconstruct the assistant turn
-                self._append_prev_response_output(messages, prev_response)
-
         # Current turn — iterate prompt.messages (auto-synthesized from
-        # legacy inputs if messages= was not explicitly passed).
+        # legacy inputs if messages= was not explicitly passed). In llm
+        # 0.32+ conversation and chain paths pre-bake the full input chain
+        # here, so also walking conversation.responses would duplicate
+        # prior turns and break tool-result ordering.
         for message in prompt.messages:
             self._append_message(messages, message)
 
