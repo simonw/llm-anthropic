@@ -1,8 +1,17 @@
 from anthropic import Anthropic, AsyncAnthropic, transform_schema
 import enum
 import llm
+from llm.parts import (
+    AttachmentPart,
+    Message,
+    ReasoningPart,
+    StreamEvent,
+    TextPart,
+    ToolCallPart,
+    ToolResultPart,
+)
 import json
-from typing import Optional, List
+from typing import Any, Dict, Optional, List
 from pydantic import Field, field_validator, model_validator
 
 DEFAULT_THINKING_TOKENS = 1024
@@ -578,136 +587,162 @@ class _Shared:
             warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
             return message.model_dump()
 
+    # --- messages= support -------------------------------------------------
+    #
+    # This plugin consumes prompt.messages (the canonical list[Message]
+    # that llm synthesizes from legacy inputs when messages= wasn't
+    # explicitly passed). Each Message + its Parts is translated into
+    # Anthropic content blocks; adjacent user-side messages (role="user"
+    # or role="tool") are merged because Anthropic requires alternating
+    # user/assistant turns.
+
+    def _part_to_block(self, part) -> Optional[Dict[str, Any]]:
+        """Translate one llm Part into an Anthropic content block."""
+        pm = getattr(part, "provider_metadata", None) or {}
+        anthropic_pm = pm.get("anthropic", {}) if isinstance(pm, dict) else {}
+        if isinstance(part, TextPart):
+            block: Dict[str, Any] = {"type": "text", "text": part.text}
+            return block
+        if isinstance(part, ReasoningPart):
+            block = {"type": "thinking", "thinking": part.text}
+            # Anthropic signed-thinking requires the signature echoed back.
+            sig = (
+                anthropic_pm.get("signature")
+                if isinstance(anthropic_pm, dict)
+                else None
+            )
+            if sig:
+                block["signature"] = sig
+            return block
+        if isinstance(part, ToolCallPart):
+            return {
+                "type": "tool_use",
+                "id": part.tool_call_id,
+                "name": part.name,
+                "input": part.arguments,
+            }
+        if isinstance(part, ToolResultPart):
+            return {
+                "type": "tool_result",
+                "tool_use_id": part.tool_call_id,
+                "content": part.output,
+            }
+        if isinstance(part, AttachmentPart) and part.attachment is not None:
+            attachment = part.attachment
+            attachment_type = (
+                "document"
+                if attachment.resolve_type() == "application/pdf"
+                else "image"
+            )
+            return {
+                "type": attachment_type,
+                "source": source_for_attachment(attachment),
+            }
+        return None
+
+    def _message_to_blocks(self, message: Message) -> List[Dict[str, Any]]:
+        blocks: List[Dict[str, Any]] = []
+        for part in message.parts:
+            block = self._part_to_block(part)
+            if block is not None:
+                blocks.append(block)
+        return blocks
+
+    def _append_message(self, out: List[Dict[str, Any]], message: Message) -> None:
+        """Append an Anthropic-shaped message, merging with the previous one
+        if both would be user-side turns (tool_result + text in the same
+        user message is the required shape for tool follow-ups)."""
+        if message.role == "system":
+            return  # system lives on the top-level kwargs["system"] field
+        blocks = self._message_to_blocks(message)
+        if not blocks:
+            return
+        # Anthropic: tool messages from llm become user messages with
+        # tool_result blocks; assistant stays assistant.
+        anthropic_role = "assistant" if message.role == "assistant" else "user"
+        if out and out[-1]["role"] == anthropic_role and anthropic_role == "user":
+            out[-1]["content"].extend(blocks)
+        else:
+            out.append({"role": anthropic_role, "content": blocks})
+
+    def _append_prev_response_output(
+        self, out: List[Dict[str, Any]], prev_response
+    ) -> None:
+        """Add the assistant turn from a previous Response. Mirrors the
+        flat text+tool_calls pattern used by the OpenAI plugin."""
+        assistant_content: List[Dict[str, Any]] = []
+        text_content = prev_response.text_or_raise()
+        if text_content:
+            assistant_content.append({"type": "text", "text": text_content})
+        for tool_call in prev_response.tool_calls_or_raise():
+            assistant_content.append(
+                {
+                    "type": "tool_use",
+                    "id": tool_call.tool_call_id,
+                    "name": tool_call.name,
+                    "input": tool_call.arguments,
+                }
+            )
+        if assistant_content:
+            out.append({"role": "assistant", "content": assistant_content})
+
     def build_messages(self, prompt, conversation) -> list[dict]:
-        messages = []
+        messages: List[Dict[str, Any]] = []
 
-        # Process existing conversation history
         if conversation:
-            for response in conversation.responses:
-                # Build user message
-                user_content = []
+            for prev_response in conversation.responses:
+                # Input side: emit each Message on prev_response.prompt.messages
+                for message in prev_response.prompt.messages:
+                    self._append_message(messages, message)
+                # Output side: reconstruct the assistant turn
+                self._append_prev_response_output(messages, prev_response)
 
-                # Handle attachments in user message
-                if response.attachments:
-                    for attachment in response.attachments:
-                        attachment_type = (
-                            "document"
-                            if attachment.resolve_type() == "application/pdf"
-                            else "image"
-                        )
-                        user_content.append(
-                            {
-                                "type": attachment_type,
-                                "source": source_for_attachment(attachment),
-                            }
-                        )
+        # Current turn — iterate prompt.messages (auto-synthesized from
+        # legacy inputs if messages= was not explicitly passed).
+        for message in prompt.messages:
+            self._append_message(messages, message)
 
-                # Add text content if it exists
-                if response.prompt.prompt:
-                    user_content.append(
-                        {"type": "text", "text": response.prompt.prompt}
-                    )
-
-                # Handle tool results if present (add to the same user message)
-                if response.prompt.tool_results:
-                    for tool_result in response.prompt.tool_results:
-                        user_content.append(
-                            {
-                                "type": "tool_result",
-                                "tool_use_id": tool_result.tool_call_id,
-                                "content": tool_result.output,
-                            }
-                        )
-
-                # Only add the message if we have content
-                if user_content:
-                    messages.append({"role": "user", "content": user_content})
-
-                # Build assistant message
-                assistant_content = []
-                text_content = response.text_or_raise()
-
-                # Add text content if it exists
-                if text_content:
-                    assistant_content.append({"type": "text", "text": text_content})
-
-                # Add tool calls if they exist
-                tool_calls = response.tool_calls_or_raise()
-                for tool_call in tool_calls:
-                    assistant_content.append(
-                        {
-                            "type": "tool_use",
-                            "id": tool_call.tool_call_id,
-                            "name": tool_call.name,
-                            "input": tool_call.arguments,
-                        }
-                    )
-
-                # Add assistant message if we have content
-                if assistant_content:
-                    messages.append({"role": "assistant", "content": assistant_content})
-
-        # Handle current prompt's tool results and user content together
-        user_content = []
-
-        # Add attachments
-        if prompt.attachments:
-            for attachment in prompt.attachments:
-                attachment_type = (
-                    "document"
-                    if attachment.resolve_type() == "application/pdf"
-                    else "image"
-                )
-                user_content.append(
-                    {
-                        "type": attachment_type,
-                        "source": source_for_attachment(attachment),
-                    }
-                )
-
-            # Add cache control if needed
-            if prompt.options.cache and user_content:
-                user_content[-1]["cache_control"] = {"type": "ephemeral"}
-
-        # Add current prompt's tool results
-        if prompt.tool_results:
-            for tool_result in prompt.tool_results:
-                user_content.append(
-                    {
-                        "type": "tool_result",
-                        "tool_use_id": tool_result.tool_call_id,
-                        "content": tool_result.output,
-                    }
-                )
-
-        # Add text content if it exists
-        if prompt.prompt:
-            user_content.append({"type": "text", "text": prompt.prompt})
-
-        # Add the user message if we have content
-        if user_content:
-            messages.append({"role": "user", "content": user_content})
-
-        # Handle cache control for messages without attachments
-        elif prompt.options.cache and messages:
+        # Cache control: apply to the last content block of the final
+        # user-side turn, matching the pre-upgrade behavior.
+        if prompt.options.cache and messages:
             last_message = messages[-1]
-            if isinstance(last_message.get("content"), list):
+            if (
+                isinstance(last_message.get("content"), list)
+                and last_message["content"]
+            ):
                 last_message["content"][-1]["cache_control"] = {"type": "ephemeral"}
-            else:
-                # This should not happen with our new structure, but keeping as a fallback
-                last_message["cache_control"] = {"type": "ephemeral"}
 
-        # Add prefill if specified
+        # Prefill — append an assistant turn the model will continue from.
         if prompt.options.prefill:
             if self.supports_adaptive_thinking:
                 raise ValueError(
                     f"Prefilling assistant messages is not supported by {self.claude_model_id}. "
                     f"Use structured outputs or system prompt instructions instead."
                 )
-            prefill_content = [{"type": "text", "text": prompt.options.prefill}]
-            messages.append({"role": "assistant", "content": prefill_content})
+            messages.append(
+                {
+                    "role": "assistant",
+                    "content": [{"type": "text", "text": prompt.options.prefill}],
+                }
+            )
 
         return messages
+
+    def _extract_system(self, prompt) -> Optional[str]:
+        """Pull the system prompt from prompt.messages or prompt.system.
+
+        ``prompt.system`` already composes ``_system`` + ``system_fragments``;
+        if messages= was passed explicitly and it contains a system-role
+        message, fall back to reading that.
+        """
+        if prompt.system:
+            return prompt.system
+        for message in prompt.messages:
+            if message.role == "system":
+                texts = [p.text for p in message.parts if isinstance(p, TextPart)]
+                if texts:
+                    return "\n\n".join(texts)
+        return None
 
     def build_kwargs(self, prompt, conversation):
         if prompt.schema and prompt.tools:
@@ -743,8 +778,9 @@ class _Shared:
         if prompt.options.top_k:
             kwargs["top_k"] = prompt.options.top_k
 
-        if prompt.system:
-            kwargs["system"] = prompt.system
+        system = self._extract_system(prompt)
+        if system:
+            kwargs["system"] = system
 
         if prompt.options.stop_sequences:
             kwargs["stop_sequences"] = prompt.options.stop_sequences
@@ -937,33 +973,122 @@ class ClaudeMessages(_Shared, llm.KeyModel):
             messages_client = client.messages
 
         if stream:
-            with messages_client.stream(**kwargs) as stream:
+            with messages_client.stream(**kwargs) as stream_obj:
+                current_block_id = None
+                current_block_name = None
+                is_server_tool = False
+
                 if prefill_text:
-                    yield prefill_text
-                for chunk in stream:
-                    if hasattr(chunk, "delta"):
+                    yield StreamEvent(type="text", chunk=prefill_text)
+
+                for chunk in stream_obj:
+                    if chunk.type == "content_block_start":
+                        block = chunk.content_block
+                        block_type = getattr(block, "type", None)
+                        current_block_id = getattr(block, "id", None)
+                        current_block_name = getattr(block, "name", None)
+                        is_server_tool = block_type in (
+                            "server_tool_use",
+                            "web_search_tool_result",
+                        )
+
+                        if block_type in ("tool_use", "server_tool_use"):
+                            yield StreamEvent(
+                                type="tool_call_name",
+                                chunk=current_block_name or "",
+                                tool_call_id=current_block_id,
+                                server_executed=(block_type == "server_tool_use"),
+                            )
+                        elif block_type == "web_search_tool_result":
+                            # Content is available inline on content_block_start
+                            tool_use_id = getattr(block, "tool_use_id", None)
+                            result_content = getattr(block, "content", [])
+                            if result_content:
+                                result_text = json.dumps(
+                                    [
+                                        b if isinstance(b, dict) else b.model_dump()
+                                        for b in result_content
+                                    ]
+                                )
+                            else:
+                                result_text = ""
+                            yield StreamEvent(
+                                type="tool_result",
+                                chunk=result_text,
+                                tool_call_id=tool_use_id,
+                                server_executed=True,
+                                tool_name="web_search",
+                            )
+
+                    elif chunk.type == "content_block_delta":
                         delta = chunk.delta
-                        if hasattr(delta, "text"):
-                            yield delta.text
-                        elif hasattr(delta, "partial_json") and prompt.schema:
-                            yield delta.partial_json
+                        delta_type = getattr(delta, "type", None)
+
+                        if delta_type == "thinking_delta":
+                            yield StreamEvent(type="reasoning", chunk=delta.thinking)
+                        elif delta_type == "text_delta":
+                            yield StreamEvent(type="text", chunk=delta.text)
+                        elif delta_type == "input_json_delta":
+                            yield StreamEvent(
+                                type="tool_call_args",
+                                chunk=delta.partial_json,
+                                tool_call_id=current_block_id,
+                                server_executed=is_server_tool,
+                            )
+
                 # This records usage and other data:
                 last_message = self._model_dump_suppress_warnings(
-                    stream.get_final_message()
+                    stream_obj.get_final_message()
                 )
                 response.response_json = last_message
+
                 if self.add_tool_usage(response, last_message):
                     # Avoid "can have dragons.Now that I " bug
-                    yield " "
+                    yield StreamEvent(type="text", chunk=" ")
         else:
             completion = messages_client.create(**kwargs)
-            text = "".join(
-                [item.text for item in completion.content if hasattr(item, "text")]
-            )
-            yield prefill_text + text
+            for item in completion.content:
+                item_type = getattr(item, "type", None)
+                if item_type == "thinking":
+                    yield StreamEvent(type="reasoning", chunk=item.thinking)
+                elif item_type == "text":
+                    text = (prefill_text + item.text) if prefill_text else item.text
+                    prefill_text = ""  # Only prepend once
+                    yield StreamEvent(type="text", chunk=text)
+                elif item_type in ("tool_use", "server_tool_use"):
+                    yield StreamEvent(
+                        type="tool_call_name",
+                        chunk=item.name,
+                        tool_call_id=item.id,
+                        server_executed=(item_type == "server_tool_use"),
+                    )
+                    yield StreamEvent(
+                        type="tool_call_args",
+                        chunk=json.dumps(item.input),
+                        tool_call_id=item.id,
+                        server_executed=(item_type == "server_tool_use"),
+                    )
+                elif item_type == "web_search_tool_result":
+                    result_content = getattr(item, "content", [])
+                    result_text = (
+                        json.dumps(
+                            [
+                                block if isinstance(block, dict) else block.model_dump()
+                                for block in result_content
+                            ]
+                        )
+                        if result_content
+                        else ""
+                    )
+                    yield StreamEvent(
+                        type="tool_result",
+                        chunk=result_text,
+                        tool_call_id=getattr(item, "tool_use_id", None),
+                        server_executed=True,
+                        tool_name="web_search",
+                    )
             response.response_json = completion.model_dump()
-            if self.add_tool_usage(response, response.response_json):
-                yield " "
+            self.add_tool_usage(response, response.response_json)
         self.set_usage(response)
 
 
@@ -979,27 +1104,114 @@ class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
 
         if stream:
             async with messages_client.stream(**kwargs) as stream_obj:
+                current_block_id = None
+                current_block_name = None
+                is_server_tool = False
+
                 if prefill_text:
-                    yield prefill_text
+                    yield StreamEvent(type="text", chunk=prefill_text)
+
                 async for chunk in stream_obj:
-                    if hasattr(chunk, "delta"):
+                    if chunk.type == "content_block_start":
+                        block = chunk.content_block
+                        block_type = getattr(block, "type", None)
+                        current_block_id = getattr(block, "id", None)
+                        current_block_name = getattr(block, "name", None)
+                        is_server_tool = block_type in (
+                            "server_tool_use",
+                            "web_search_tool_result",
+                        )
+
+                        if block_type in ("tool_use", "server_tool_use"):
+                            yield StreamEvent(
+                                type="tool_call_name",
+                                chunk=current_block_name or "",
+                                tool_call_id=current_block_id,
+                                server_executed=(block_type == "server_tool_use"),
+                            )
+                        elif block_type == "web_search_tool_result":
+                            tool_use_id = getattr(block, "tool_use_id", None)
+                            result_content = getattr(block, "content", [])
+                            if result_content:
+                                result_text = json.dumps(
+                                    [
+                                        b if isinstance(b, dict) else b.model_dump()
+                                        for b in result_content
+                                    ]
+                                )
+                            else:
+                                result_text = ""
+                            yield StreamEvent(
+                                type="tool_result",
+                                chunk=result_text,
+                                tool_call_id=tool_use_id,
+                                server_executed=True,
+                                tool_name="web_search",
+                            )
+
+                    elif chunk.type == "content_block_delta":
                         delta = chunk.delta
-                        if hasattr(delta, "text"):
-                            yield delta.text
-                        elif hasattr(delta, "partial_json") and prompt.schema:
-                            yield delta.partial_json
+                        delta_type = getattr(delta, "type", None)
+
+                        if delta_type == "thinking_delta":
+                            yield StreamEvent(type="reasoning", chunk=delta.thinking)
+                        elif delta_type == "text_delta":
+                            yield StreamEvent(type="text", chunk=delta.text)
+                        elif delta_type == "input_json_delta":
+                            yield StreamEvent(
+                                type="tool_call_args",
+                                chunk=delta.partial_json,
+                                tool_call_id=current_block_id,
+                                server_executed=is_server_tool,
+                            )
+
             response.response_json = self._model_dump_suppress_warnings(
                 await stream_obj.get_final_message()
             )
-            # TODO: Test this:
+
             self.add_tool_usage(response, response.response_json)
         else:
             completion = await messages_client.create(**kwargs)
-            text = "".join(
-                [item.text for item in completion.content if hasattr(item, "text")]
-            )
-            yield prefill_text + text
+            for item in completion.content:
+                item_type = getattr(item, "type", None)
+                if item_type == "thinking":
+                    yield StreamEvent(type="reasoning", chunk=item.thinking)
+                elif item_type == "text":
+                    text = (prefill_text + item.text) if prefill_text else item.text
+                    prefill_text = ""
+                    yield StreamEvent(type="text", chunk=text)
+                elif item_type in ("tool_use", "server_tool_use"):
+                    yield StreamEvent(
+                        type="tool_call_name",
+                        chunk=item.name,
+                        tool_call_id=item.id,
+                        server_executed=(item_type == "server_tool_use"),
+                    )
+                    yield StreamEvent(
+                        type="tool_call_args",
+                        chunk=json.dumps(item.input),
+                        tool_call_id=item.id,
+                        server_executed=(item_type == "server_tool_use"),
+                    )
+                elif item_type == "web_search_tool_result":
+                    result_content = getattr(item, "content", [])
+                    result_text = (
+                        json.dumps(
+                            [
+                                block if isinstance(block, dict) else block.model_dump()
+                                for block in result_content
+                            ]
+                        )
+                        if result_content
+                        else ""
+                    )
+                    yield StreamEvent(
+                        type="tool_result",
+                        chunk=result_text,
+                        tool_call_id=getattr(item, "tool_use_id", None),
+                        server_executed=True,
+                        tool_name="web_search",
+                    )
             response.response_json = completion.model_dump()
-            # TODO: Test this:
             self.add_tool_usage(response, response.response_json)
         self.set_usage(response)

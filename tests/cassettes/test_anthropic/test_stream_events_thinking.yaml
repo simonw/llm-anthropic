@@ -1,0 +1,142 @@
+interactions:
+- request:
+    body: '{"max_tokens":8192,"messages":[{"role":"user","content":[{"type":"text","text":"Two
+      names for a pet pelican, be brief"}]}],"model":"claude-haiku-4-5-20251001","temperature":1.0,"thinking":{"type":"enabled","budget_tokens":1024},"stream":true}'
+    headers:
+      Accept:
+      - application/json
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '242'
+      Content-Type:
+      - application/json
+      Host:
+      - api.anthropic.com
+      User-Agent:
+      - Anthropic/Python 0.89.0
+      X-Stainless-Arch:
+      - arm64
+      X-Stainless-Async:
+      - 'false'
+      X-Stainless-Helper-Method:
+      - stream
+      X-Stainless-Lang:
+      - python
+      X-Stainless-OS:
+      - MacOS
+      X-Stainless-Package-Version:
+      - 0.89.0
+      X-Stainless-Runtime:
+      - CPython
+      X-Stainless-Runtime-Version:
+      - 3.14.3
+      X-Stainless-Stream-Helper:
+      - messages
+      anthropic-version:
+      - '2023-06-01'
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-timeout:
+      - NOT_GIVEN
+    method: POST
+    uri: https://api.anthropic.com/v1/messages
+  response:
+    body:
+      string: !!binary |
+        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
+    headers:
+      CF-RAY:
+      - 9e793dac0eec6809-SJC
+      Cache-Control:
+      - no-cache
+      Connection:
+      - keep-alive
+      Content-Encoding:
+      - gzip
+      Content-Security-Policy:
+      - default-src 'none'; frame-ancestors 'none'
+      Content-Type:
+      - text/event-stream; charset=utf-8
+      Date:
+      - Sun, 05 Apr 2026 14:28:43 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      X-Robots-Tag:
+      - none
+      anthropic-organization-id:
+      - b320df16-c763-4455-b901-3f7d54e9a012
+      anthropic-ratelimit-input-tokens-limit:
+      - '4000000'
+      anthropic-ratelimit-input-tokens-remaining:
+      - '4000000'
+      anthropic-ratelimit-input-tokens-reset:
+      - '2026-04-05T14:28:43Z'
+      anthropic-ratelimit-output-tokens-limit:
+      - '800000'
+      anthropic-ratelimit-output-tokens-remaining:
+      - '800000'
+      anthropic-ratelimit-output-tokens-reset:
+      - '2026-04-05T14:28:43Z'
+      anthropic-ratelimit-requests-limit:
+      - '20000'
+      anthropic-ratelimit-requests-remaining:
+      - '19999'
+      anthropic-ratelimit-requests-reset:
+      - '2026-04-05T14:28:43Z'
+      anthropic-ratelimit-tokens-limit:
+      - '4800000'
+      anthropic-ratelimit-tokens-remaining:
+      - '4800000'
+      anthropic-ratelimit-tokens-reset:
+      - '2026-04-05T14:28:43Z'
+      cf-cache-status:
+      - DYNAMIC
+      request-id:
+      - req_011CZknLUJYvpB2LarebrVDv
+      server-timing:
+      - x-originResponse;dur=375
+      set-cookie:
+      - _cfuvid=zavauCtF4674_r_O8z3mSZTGGGDdiAQXD9OFVY5Lprk-1775399323.52791-1.0.1.1-Jkihjf2in7riUCbJsSX.KFGqQnHx5JQudcB764QPBig;
+        HttpOnly; SameSite=None; Secure; Path=/; Domain=api.anthropic.com
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      vary:
+      - Accept-Encoding
+      x-envoy-upstream-service-time:
+      - '373'
+    status:
+      code: 200
+      message: OK
+version: 1
