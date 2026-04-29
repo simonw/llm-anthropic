@@ -419,7 +419,7 @@ def test_parts_thinking():
     model.key = model.key or ANTHROPIC_API_KEY
     response = model.prompt("Two names for a pet pelican, be brief", thinking=True)
     response.text()
-    parts = [p for m in response.messages for p in m.parts]
+    parts = [p for m in response.messages() for p in m.parts]
     reasoning_parts = [p for p in parts if isinstance(p, ReasoningPart)]
     text_parts = [p for p in parts if isinstance(p, TextPart)]
     assert len(reasoning_parts) >= 1, "Should have reasoning part"
@@ -478,7 +478,7 @@ def test_web_search_tool_result_ordering():
     )
 
     # Also verify via parts
-    parts = [p for m in response.messages for p in m.parts]
+    parts = [p for m in response.messages() for p in m.parts]
     part_types = [type(p).__name__ for p in parts]
     # ToolResultPart should appear before the main TextParts
     if "ToolResultPart" in part_types and "TextPart" in part_types:
