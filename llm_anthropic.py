@@ -651,11 +651,7 @@ class _Shared:
             seen_tool_use = False
             for block in blocks:
                 block_type = block.get("type")
-                if (
-                    seen_tool_use
-                    and block_type == "text"
-                    and block.get("text") == " "
-                ):
+                if seen_tool_use and block_type == "text" and block.get("text") == " ":
                     # The sync streaming path yields a display-only space
                     # after tool calls so chained text does not run together.
                     # Anthropic rejects assistant history that places text
@@ -1040,6 +1036,14 @@ class ClaudeMessages(_Shared, llm.KeyModel):
 
                         if delta_type == "thinking_delta":
                             yield StreamEvent(type="reasoning", chunk=delta.thinking)
+                        elif delta_type == "signature_delta":
+                            yield StreamEvent(
+                                type="reasoning",
+                                chunk="",
+                                provider_metadata={
+                                    "anthropic": {"signature": delta.signature}
+                                },
+                            )
                         elif delta_type == "text_delta":
                             yield StreamEvent(type="text", chunk=delta.text)
                         elif delta_type == "input_json_delta":
@@ -1064,7 +1068,16 @@ class ClaudeMessages(_Shared, llm.KeyModel):
             for item in completion.content:
                 item_type = getattr(item, "type", None)
                 if item_type == "thinking":
-                    yield StreamEvent(type="reasoning", chunk=item.thinking)
+                    signature = getattr(item, "signature", None)
+                    yield StreamEvent(
+                        type="reasoning",
+                        chunk=item.thinking,
+                        provider_metadata=(
+                            {"anthropic": {"signature": signature}}
+                            if signature
+                            else None
+                        ),
+                    )
                 elif item_type == "text":
                     text = (prefill_text + item.text) if prefill_text else item.text
                     prefill_text = ""  # Only prepend once
@@ -1169,6 +1182,14 @@ class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
 
                         if delta_type == "thinking_delta":
                             yield StreamEvent(type="reasoning", chunk=delta.thinking)
+                        elif delta_type == "signature_delta":
+                            yield StreamEvent(
+                                type="reasoning",
+                                chunk="",
+                                provider_metadata={
+                                    "anthropic": {"signature": delta.signature}
+                                },
+                            )
                         elif delta_type == "text_delta":
                             yield StreamEvent(type="text", chunk=delta.text)
                         elif delta_type == "input_json_delta":
@@ -1189,7 +1210,16 @@ class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
             for item in completion.content:
                 item_type = getattr(item, "type", None)
                 if item_type == "thinking":
-                    yield StreamEvent(type="reasoning", chunk=item.thinking)
+                    signature = getattr(item, "signature", None)
+                    yield StreamEvent(
+                        type="reasoning",
+                        chunk=item.thinking,
+                        provider_metadata=(
+                            {"anthropic": {"signature": signature}}
+                            if signature
+                            else None
+                        ),
+                    )
                 elif item_type == "text":
                     text = (prefill_text + item.text) if prefill_text else item.text
                     prefill_text = ""

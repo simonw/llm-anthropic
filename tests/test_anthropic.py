@@ -16,6 +16,18 @@ TINY_PNG = (
 )
 
 ANTHROPIC_API_KEY = os.environ.get("PYTEST_ANTHROPIC_API_KEY", None) or "sk-..."
+FIXED_TEST_VERSION = "0.32a0"
+
+
+def fixed_version_tool():
+    def fixed_version() -> str:
+        return FIXED_TEST_VERSION
+
+    return llm.Tool.function(
+        fixed_version,
+        name="fixed_version",
+        description="Return a fixed test version string",
+    )
 
 
 @pytest.mark.vcr
@@ -286,20 +298,20 @@ def test_tools():
 
 
 @pytest.mark.vcr
-def test_llm_version_tool_chain_regression():
+def test_fixed_version_tool_chain_regression():
     model = llm.get_model("claude-haiku-4.5")
-    from llm.tools import llm_version
+    fixed_version = fixed_version_tool()
 
     chain_response = model.chain(
-        "Use the llm_version tool. Then tell me the version and make one short joke about it.",
-        tools=[llm_version],
+        "Use the fixed_version tool. Then tell me the version and make one short joke about it.",
+        tools=[fixed_version],
         key=ANTHROPIC_API_KEY,
     )
     text = chain_response.text()
-    assert llm_version() in text
+    assert FIXED_TEST_VERSION in text
     assert len(chain_response._responses) == 2
     second_response = chain_response._responses[1]
-    assert second_response.prompt.tool_results[0].output == llm_version()
+    assert second_response.prompt.tool_results[0].output == FIXED_TEST_VERSION
     second_request_messages = model.build_messages(
         second_response.prompt, second_response.conversation
     )
@@ -308,6 +320,44 @@ def test_llm_version_tool_chain_regression():
         "assistant",
         "user",
     ]
+    assert second_request_messages[1]["content"][-1]["type"] == "tool_use"
+    assert [block["type"] for block in second_request_messages[2]["content"]] == [
+        "tool_result"
+    ]
+
+
+@pytest.mark.vcr
+def test_fixed_version_tool_chain_with_thinking_display_regression():
+    model = llm.get_model("claude-haiku-4.5")
+    from llm.parts import ReasoningPart
+
+    fixed_version = fixed_version_tool()
+
+    chain_response = model.chain(
+        "Use the fixed_version tool. Then tell me the version and make one short joke about it. Think about it first.",
+        tools=[fixed_version],
+        key=ANTHROPIC_API_KEY,
+        options={"thinking_display": True},
+    )
+    text = chain_response.text()
+    assert FIXED_TEST_VERSION in text
+    assert len(chain_response._responses) == 2
+
+    first_response = chain_response._responses[0]
+    reasoning_parts = [
+        part
+        for message in first_response.messages()
+        for part in message.parts
+        if isinstance(part, ReasoningPart)
+    ]
+    assert reasoning_parts[0].provider_metadata["anthropic"]["signature"]
+
+    second_response = chain_response._responses[1]
+    second_request_messages = model.build_messages(
+        second_response.prompt, second_response.conversation
+    )
+    assert second_request_messages[1]["content"][0]["type"] == "thinking"
+    assert second_request_messages[1]["content"][0]["signature"]
     assert second_request_messages[1]["content"][-1]["type"] == "tool_use"
     assert [block["type"] for block in second_request_messages[2]["content"]] == [
         "tool_result"
@@ -453,6 +503,7 @@ def test_parts_thinking():
     text_parts = [p for p in parts if isinstance(p, TextPart)]
     assert len(reasoning_parts) >= 1, "Should have reasoning part"
     assert len(text_parts) >= 1, "Should have text part"
+    assert reasoning_parts[0].provider_metadata["anthropic"]["signature"]
     assert reasoning_parts[0].text, "Reasoning text should not be empty"
     assert text_parts[0].text, "Text should not be empty"
 
@@ -634,6 +685,96 @@ def test_build_messages_reasoning_round_trips_signature():
         "thinking": "thinking...",
         "signature": "sig-abc",
     }
+
+
+def test_load_conversation_preserves_logged_tool_chain_for_anthropic(tmp_path):
+    """Regression for llm -c after a logged tool call chain.
+
+    LLM 0.32a0 rehydrates the final tool-result response as if its
+    prompt.messages started with only the current tool_result turn. That
+    makes Anthropic reject the next continuation because the request starts
+    with an orphan tool_result instead of the preceding assistant tool_use.
+    """
+    import datetime
+    import sqlite_utils
+    from llm.cli import load_conversation
+    from llm.migrations import migrate
+    from llm.parts import ToolCallPart, ToolResultPart
+
+    model = llm.get_model("claude-haiku-4.5")
+
+    def tick() -> str:
+        return "tock"
+
+    tool = llm.Tool.function(tick, name="tick")
+    conversation = model.conversation()
+
+    def mark_done(response):
+        response._done = True
+        response._start = 0.0
+        response._end = 0.0
+        response._start_utcnow = datetime.datetime.now(datetime.timezone.utc)
+
+    first = llm.Response(
+        llm.Prompt("q1", model=model, tools=[tool], options=model.Options()),
+        model,
+        stream=False,
+        conversation=conversation,
+    )
+    first.add_tool_call(llm.ToolCall(name="tick", arguments={}, tool_call_id="c1"))
+    mark_done(first)
+
+    tool_result = llm.ToolResult(name="tick", output="tock", tool_call_id="c1")
+    second_chain = [
+        llm.user("q1"),
+        llm.Message(
+            role="assistant",
+            parts=[ToolCallPart(name="tick", arguments={}, tool_call_id="c1")],
+        ),
+        llm.Message(
+            role="tool",
+            parts=[ToolResultPart(name="tick", output="tock", tool_call_id="c1")],
+        ),
+    ]
+    second = llm.Response(
+        llm.Prompt(
+            "",
+            model=model,
+            tools=[tool],
+            tool_results=[tool_result],
+            messages=second_chain,
+            options=model.Options(),
+        ),
+        model,
+        stream=False,
+        conversation=conversation,
+    )
+    second._chunks = ["final answer"]
+    second._stream_events = [llm.parts.StreamEvent(type="text", chunk="final answer")]
+    mark_done(second)
+
+    db = sqlite_utils.Database(str(tmp_path / "logs.db"))
+    migrate(db)
+    first.log_to_db(db)
+    conversation.responses.append(first)
+    second.log_to_db(db)
+    conversation.responses.append(second)
+
+    loaded = load_conversation(None, database=str(tmp_path / "logs.db"))
+    follow_up = loaded.prompt("q2")
+    anthropic_messages = model.build_messages(follow_up.prompt, loaded)
+
+    assert anthropic_messages[0]["content"] == [{"type": "text", "text": "q1"}]
+    assert anthropic_messages[1]["content"] == [
+        {"type": "tool_use", "id": "c1", "name": "tick", "input": {}}
+    ]
+    assert anthropic_messages[2]["content"] == [
+        {"type": "tool_result", "tool_use_id": "c1", "content": "tock"}
+    ]
+    assert anthropic_messages[3]["content"] == [
+        {"type": "text", "text": "final answer"}
+    ]
+    assert anthropic_messages[4]["content"] == [{"type": "text", "text": "q2"}]
 
 
 def test_extract_system_from_messages():
