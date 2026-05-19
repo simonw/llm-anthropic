@@ -4,6 +4,7 @@ import os
 import pytest
 from inline_snapshot import snapshot
 from pydantic import BaseModel
+from unittest.mock import patch, MagicMock
 
 TINY_PNG = (
     b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\xa6\x00\x00\x01\x1a"
@@ -793,3 +794,67 @@ def test_extract_system_prefers_prompt_system_over_messages():
     model = llm.get_model("claude-sonnet-4.5")
     p = llm.Prompt(None, model=model, system="legacy sys", messages=[user("hi")])
     assert model._extract_system(p) == "legacy sys"
+
+
+def test_base_url_option_passed_to_client():
+    """When base_url is set via options, it is forwarded to the Anthropic client."""
+    model = llm.get_model("claude-sonnet-4.5")
+
+    fake_message = MagicMock()
+    fake_message.content = [MagicMock(type="text", text="hello")]
+    fake_message.model_dump.return_value = {
+        "content": [{"type": "text", "text": "hello"}],
+        "usage": {"input_tokens": 5, "output_tokens": 3},
+    }
+
+    fake_messages_client = MagicMock()
+    fake_messages_client.create.return_value = fake_message
+
+    fake_client = MagicMock()
+    fake_client.messages = fake_messages_client
+
+    with patch("llm_anthropic.Anthropic") as mock_anthropic:
+        mock_anthropic.return_value = fake_client
+        response = model.prompt(
+            "hello",
+            base_url="https://my-proxy.example.com/v1",
+            key=ANTHROPIC_API_KEY,
+            stream=False,
+        )
+        # Consume the response
+        _ = response.text()
+
+    mock_anthropic.assert_called_once()
+    _, kwargs = mock_anthropic.call_args
+    assert kwargs.get("base_url") == "https://my-proxy.example.com/v1"
+
+
+def test_base_url_option_not_set_uses_model_default():
+    """When base_url option is not set, the model's own base_url is used (None by default)."""
+    model = llm.get_model("claude-sonnet-4.5")
+
+    fake_message = MagicMock()
+    fake_message.content = [MagicMock(type="text", text="hello")]
+    fake_message.model_dump.return_value = {
+        "content": [{"type": "text", "text": "hello"}],
+        "usage": {"input_tokens": 5, "output_tokens": 3},
+    }
+
+    fake_messages_client = MagicMock()
+    fake_messages_client.create.return_value = fake_message
+
+    fake_client = MagicMock()
+    fake_client.messages = fake_messages_client
+
+    with patch("llm_anthropic.Anthropic") as mock_anthropic:
+        mock_anthropic.return_value = fake_client
+        response = model.prompt(
+            "hello",
+            key=ANTHROPIC_API_KEY,
+            stream=False,
+        )
+        _ = response.text()
+
+    mock_anthropic.assert_called_once()
+    _, kwargs = mock_anthropic.call_args
+    assert kwargs.get("base_url") is None
