@@ -383,6 +383,11 @@ class ClaudeOptions(llm.Options):
         default=None,
     )
 
+    base_url: Optional[str] = Field(
+        description="Custom base URL for the Anthropic API, e.g. for proxies or self-hosted endpoints",
+        default=None,
+    )
+
     @field_validator("stop_sequences")
     def validate_stop_sequences(cls, stop_sequences):
         error_msg = "stop_sequences must be a list of strings or a single string"
@@ -974,7 +979,8 @@ class _Shared:
 
 class ClaudeMessages(_Shared, llm.KeyModel):
     def execute(self, prompt, stream, response, conversation, key):
-        client = Anthropic(api_key=self.get_key(key), base_url=self.base_url)
+        base_url = prompt.options.base_url or self.base_url
+        client = Anthropic(api_key=self.get_key(key), base_url=base_url)
         kwargs = self.build_kwargs(prompt, conversation)
         prefill_text = self.prefill_text(prompt)
         if "betas" in kwargs:
@@ -1121,7 +1127,8 @@ class ClaudeMessages(_Shared, llm.KeyModel):
 
 class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
     async def execute(self, prompt, stream, response, conversation, key):
-        client = AsyncAnthropic(api_key=self.get_key(key), base_url=self.base_url)
+        base_url = prompt.options.base_url or self.base_url
+        client = AsyncAnthropic(api_key=self.get_key(key), base_url=base_url)
         kwargs = self.build_kwargs(prompt, conversation)
         if "betas" in kwargs:
             messages_client = client.beta.messages
