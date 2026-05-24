@@ -406,7 +406,7 @@ class ClaudeOptions(llm.Options):
     @field_validator("temperature")
     @classmethod
     def validate_temperature(cls, temperature):
-        if not (0.0 <= temperature <= 1.0):
+        if temperature is not None and not (0.0 <= temperature <= 1.0):
             raise ValueError("temperature must be in range 0.0-1.0")
         return temperature
 
@@ -454,7 +454,7 @@ class ClaudeOptions(llm.Options):
 
     @model_validator(mode="after")
     def validate_temperature_top_p(self):
-        if self.temperature != 1.0 and self.top_p is not None:
+        if self.temperature is not None and self.top_p is not None:
             raise ValueError("Only one of temperature and top_p can be set")
         return self
 
