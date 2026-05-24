@@ -3,6 +3,7 @@ import llm
 import os
 import pytest
 from inline_snapshot import snapshot
+from llm_anthropic import ClaudeOptions
 from pydantic import BaseModel
 
 TINY_PNG = (
@@ -793,3 +794,23 @@ def test_extract_system_prefers_prompt_system_over_messages():
     model = llm.get_model("claude-sonnet-4.5")
     p = llm.Prompt(None, model=model, system="legacy sys", messages=[user("hi")])
     assert model._extract_system(p) == "legacy sys"
+
+
+def test_options_top_p_alone_does_not_collide_with_default_temperature():
+    """top_p set, temperature unset (None by default) shouldn't trigger the
+    'only one of temperature and top_p can be set' guard."""
+    opts = ClaudeOptions(top_p=0.9)
+    assert opts.top_p == 0.9
+    assert opts.temperature is None
+
+
+def test_options_explicit_none_temperature_is_accepted():
+    """Passing temperature=None explicitly used to crash inside the
+    range-check because None doesn't compare with floats."""
+    opts = ClaudeOptions(temperature=None)
+    assert opts.temperature is None
+
+
+def test_options_both_temperature_and_top_p_set_still_rejects():
+    with pytest.raises(ValueError, match="Only one of temperature and top_p"):
+        ClaudeOptions(temperature=0.5, top_p=0.9)
