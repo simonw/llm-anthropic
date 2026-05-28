@@ -382,6 +382,11 @@ class ClaudeOptions(llm.Options):
         default=None,
     )
 
+    fast: bool | None = Field(
+        description="Use fast mode for lower latency responses: https://platform.claude.com/docs/en/build-with-claude/fast-mode",
+        default=None,
+    )
+
     web_search: Optional[bool] = Field(
         description="Enable web search capabilities",
         default=None,
@@ -907,6 +912,11 @@ class _Shared:
                 "type": "json_schema",
                 "schema": transform_schema(prompt.schema),
             }
+
+        # Fast mode for lower latency responses
+        if prompt.options.fast:
+            kwargs["speed"] = "fast"
+            betas.append("fast-mode-2026-02-01")
 
         if betas:
             kwargs["betas"] = betas

@@ -76,6 +76,13 @@ Newer models support web search for real-time information:
 llm -m claude-3.5-sonnet -o web_search 1 'What is the current weather in San Francisco?'
 ```
 
+## Fast mode
+
+Some models support [fast mode](https://platform.claude.com/docs/en/build-with-claude/fast-mode) for lower latency responses. Enable it with the `-o fast 1` option:
+```bash
+llm -m claude-opus-4.8 -o fast 1 'Fun facts about walruses'
+```
+
 ## Usage from Python
 
 Python code can access the models like this:
@@ -189,6 +196,10 @@ cog.out("".join(output))
 - **cache**: `boolean`
 
     Use Anthropic prompt cache for any attachments or fragments
+
+- **fast**: `boolean`
+
+    Use fast mode for lower latency responses: https://platform.claude.com/docs/en/build-with-claude/fast-mode
 
 - **web_search**: `boolean`
 
