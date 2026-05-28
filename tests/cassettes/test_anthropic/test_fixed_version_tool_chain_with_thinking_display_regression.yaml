@@ -1,0 +1,316 @@
+interactions:
+- request:
+    body: '{"max_tokens":64000,"messages":[{"role":"user","content":[{"type":"text","text":"Use
+      the fixed_version tool. Then tell me the version and make one short joke about
+      it. Think about it first."}]}],"model":"claude-haiku-4-5-20251001","temperature":1.0,"tools":[{"name":"fixed_version","description":"Return
+      a fixed test version string","input_schema":{"properties":{},"type":"object"}}],"thinking":{"type":"enabled","budget_tokens":1024,"display":"summarized"},"stream":true}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      anthropic-version:
+      - '2023-06-01'
+      connection:
+      - keep-alive
+      content-length:
+      - '472'
+      content-type:
+      - application/json
+      host:
+      - api.anthropic.com
+      user-agent:
+      - Anthropic/Python 0.96.0
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-helper-method:
+      - stream
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 0.96.0
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.14.3
+      x-stainless-stream-helper:
+      - messages
+      x-stainless-timeout:
+      - NOT_GIVEN
+    method: POST
+    uri: https://api.anthropic.com/v1/messages
+  response:
+    body:
+      string: 'event: message_start
+
+        data: {"type":"message_start","message":{"model":"claude-haiku-4-5-20251001","id":"msg_01JdU4xqNHXL9QCFWkwCDKGr","type":"message","role":"assistant","content":[],"stop_reason":null,"stop_sequence":null,"stop_details":null,"usage":{"input_tokens":598,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":0},"output_tokens":8,"service_tier":"standard","inference_geo":"not_available"}}             }
+
+
+        event: content_block_start
+
+        data: {"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":"","signature":""}  }
+
+
+        event: ping
+
+        data: {"type": "ping"}
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"The
+        user wants me to:\n1"}         }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":".
+        Use the fixed_version tool\n2. Tell them the version\n3. Make a short joke
+        about it\n\nLet me first call the fixed_version tool to see what version it
+        returns."}               }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":""}             }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"signature_delta","signature":"EoQDCm0IDhgCKkCDzGs2kL2PgnDCZU/nM2wG2P1VIXCRHVnhDDzBQxNF1fl4QBXEKLxRItNJ2MwFdW9eeZPhsxSQIxD54cv3zs29MhljbGF1ZGUtaGFpa3UtNC01LTIwMjUxMDAxOABCCHRoaW5raW5nEgy/OWlwTmmqUjC6L70aDJ4P0R5NfuIe9U5zAiIwCxPduXS2UxCNxJCee3i91qK3cAyAgxCjL2wkQ5UD56iX1hXGOyuNaiH5k+dF5OCQKsQBxiAo+NjC61hV8nRYtaiP+C4inOcuMKuTG9Z1rysxTXkKBTl3oMiOlnEPHHPpKpg4sYF2G5VoTg8JTon20hdZw4GfTEVupnU1qAmnMqyAgke9SoV7HBW/PyA/FxL/q33xJ2gKFiD+BsgI9Z0koMmFKCvm2MoYE6u+ONEwKdFQXL1FKRW6t/bYbJGrLJLwxilsL82h9j4xjggjMn8Npvpn+zsrDPW/8PuLd4Pu+/EsjoneYwyxQQtUVgzhVGhhANWRjSBwUxgB"}               }
+
+
+        event: content_block_stop
+
+        data: {"type":"content_block_stop","index":0           }
+
+
+        event: content_block_start
+
+        data: {"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"toolu_01825dXWLSoJwCst1qTsiWdb","name":"fixed_version","input":{},"caller":{"type":"direct"}}             }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":""}             }
+
+
+        event: content_block_stop
+
+        data: {"type":"content_block_stop","index":1       }
+
+
+        event: message_delta
+
+        data: {"type":"message_delta","delta":{"stop_reason":"tool_use","stop_sequence":null,"stop_details":null},"usage":{"input_tokens":598,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":92,"output_tokens_details":{"thinking_tokens":53}}}
+
+
+        event: message_stop
+
+        data: {"type":"message_stop"    }
+
+
+        '
+    headers:
+      CF-RAY:
+      - a0309f0a1ff6945e-SJC
+      Cache-Control:
+      - no-cache
+      Connection:
+      - keep-alive
+      Content-Security-Policy:
+      - default-src 'none'; frame-ancestors 'none'
+      Content-Type:
+      - text/event-stream; charset=utf-8
+      Date:
+      - Thu, 28 May 2026 22:16:00 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      X-Robots-Tag:
+      - none
+      anthropic-organization-id:
+      - b320df16-c763-4455-b901-3f7d54e9a012
+      anthropic-ratelimit-input-tokens-limit:
+      - '4000000'
+      anthropic-ratelimit-input-tokens-remaining:
+      - '4000000'
+      anthropic-ratelimit-input-tokens-reset:
+      - '2026-05-28T22:16:00Z'
+      anthropic-ratelimit-output-tokens-limit:
+      - '800000'
+      anthropic-ratelimit-output-tokens-remaining:
+      - '800000'
+      anthropic-ratelimit-output-tokens-reset:
+      - '2026-05-28T22:16:00Z'
+      anthropic-ratelimit-requests-limit:
+      - '20000'
+      anthropic-ratelimit-requests-remaining:
+      - '19999'
+      anthropic-ratelimit-requests-reset:
+      - '2026-05-28T22:16:00Z'
+      anthropic-ratelimit-tokens-limit:
+      - '4800000'
+      anthropic-ratelimit-tokens-remaining:
+      - '4800000'
+      anthropic-ratelimit-tokens-reset:
+      - '2026-05-28T22:16:00Z'
+      cf-cache-status:
+      - DYNAMIC
+      content-length:
+      - '2804'
+      request-id:
+      - req_011CbVjqiXA7wxBTF7BBSFMV
+      set-cookie:
+      - _cfuvid=og5nwd1Udt67QaLbIALkUUk3WAFhuRogm9OfhcWWBlI-1780006560.3328826-1.0.1.1-PKLfrTQ6CKl7ObmtoghfnH524hsy4EiCXmAzWasgLDY;
+        HttpOnly; SameSite=None; Secure; Path=/; Domain=api.anthropic.com
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      traceresponse:
+      - 00-d64df759c37a0cb5c25fedbd3bdbc796-069603c9fab25c00-01
+      vary:
+      - Accept-Encoding
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"max_tokens":64000,"messages":[{"role":"user","content":[{"type":"text","text":"Use
+      the fixed_version tool. Then tell me the version and make one short joke about
+      it. Think about it first."}]},{"role":"assistant","content":[{"type":"thinking","thinking":"The
+      user wants me to:\n1. Use the fixed_version tool\n2. Tell them the version\n3.
+      Make a short joke about it\n\nLet me first call the fixed_version tool to see
+      what version it returns.","signature":"EoQDCm0IDhgCKkCDzGs2kL2PgnDCZU/nM2wG2P1VIXCRHVnhDDzBQxNF1fl4QBXEKLxRItNJ2MwFdW9eeZPhsxSQIxD54cv3zs29MhljbGF1ZGUtaGFpa3UtNC01LTIwMjUxMDAxOABCCHRoaW5raW5nEgy/OWlwTmmqUjC6L70aDJ4P0R5NfuIe9U5zAiIwCxPduXS2UxCNxJCee3i91qK3cAyAgxCjL2wkQ5UD56iX1hXGOyuNaiH5k+dF5OCQKsQBxiAo+NjC61hV8nRYtaiP+C4inOcuMKuTG9Z1rysxTXkKBTl3oMiOlnEPHHPpKpg4sYF2G5VoTg8JTon20hdZw4GfTEVupnU1qAmnMqyAgke9SoV7HBW/PyA/FxL/q33xJ2gKFiD+BsgI9Z0koMmFKCvm2MoYE6u+ONEwKdFQXL1FKRW6t/bYbJGrLJLwxilsL82h9j4xjggjMn8Npvpn+zsrDPW/8PuLd4Pu+/EsjoneYwyxQQtUVgzhVGhhANWRjSBwUxgB"},{"type":"tool_use","id":"toolu_01825dXWLSoJwCst1qTsiWdb","name":"fixed_version","input":{}}]},{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_01825dXWLSoJwCst1qTsiWdb","content":"0.32a0"}]}],"model":"claude-haiku-4-5-20251001","temperature":1.0,"tools":[{"name":"fixed_version","description":"Return
+      a fixed test version string","input_schema":{"properties":{},"type":"object"}}],"thinking":{"type":"enabled","budget_tokens":1024,"display":"summarized"},"stream":true}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      anthropic-version:
+      - '2023-06-01'
+      connection:
+      - keep-alive
+      content-length:
+      - '1472'
+      content-type:
+      - application/json
+      host:
+      - api.anthropic.com
+      user-agent:
+      - Anthropic/Python 0.96.0
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-helper-method:
+      - stream
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 0.96.0
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.14.3
+      x-stainless-stream-helper:
+      - messages
+      x-stainless-timeout:
+      - NOT_GIVEN
+    method: POST
+    uri: https://api.anthropic.com/v1/messages
+  response:
+    body:
+      string: "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"model\":\"claude-haiku-4-5-20251001\",\"id\":\"msg_01Qb3MMmP6RUjBckfsEVddrQ\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":707,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":4,\"service_tier\":\"standard\",\"inference_geo\":\"not_available\"}}
+        \        }\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\nevent:
+        ping\ndata: {\"type\": \"ping\"}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"The
+        version is **\"}    }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"0.32a0**.\\n\\nHere's
+        a joke about it: \\n\\nLooks like this version is still\"}        }\n\nevent:
+        content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"
+        in alpha testing... I guess you could say it's going through a \\\"0\"}         }\n\nevent:
+        content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\".32a
+        good time\\\" before becoming stable! \U0001F604\\n\\n(It's at version\"}
+        \        }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"
+        0.32a, which means it's far from 1.0, so plenty\"}        }\n\nevent: content_block_delta\ndata:
+        {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"
+        of room to grow!)\"}}\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0
+        \              }\n\nevent: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null},\"usage\":{\"input_tokens\":707,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":89,\"output_tokens_details\":{\"thinking_tokens\":0}}
+        \             }\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"           }\n\n"
+    headers:
+      CF-RAY:
+      - a0309f0fbabf9cd0-SJC
+      Cache-Control:
+      - no-cache
+      Connection:
+      - keep-alive
+      Content-Security-Policy:
+      - default-src 'none'; frame-ancestors 'none'
+      Content-Type:
+      - text/event-stream; charset=utf-8
+      Date:
+      - Thu, 28 May 2026 22:16:02 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      X-Robots-Tag:
+      - none
+      anthropic-organization-id:
+      - b320df16-c763-4455-b901-3f7d54e9a012
+      anthropic-ratelimit-input-tokens-limit:
+      - '4000000'
+      anthropic-ratelimit-input-tokens-remaining:
+      - '4000000'
+      anthropic-ratelimit-input-tokens-reset:
+      - '2026-05-28T22:16:01Z'
+      anthropic-ratelimit-output-tokens-limit:
+      - '800000'
+      anthropic-ratelimit-output-tokens-remaining:
+      - '800000'
+      anthropic-ratelimit-output-tokens-reset:
+      - '2026-05-28T22:16:01Z'
+      anthropic-ratelimit-requests-limit:
+      - '20000'
+      anthropic-ratelimit-requests-remaining:
+      - '19999'
+      anthropic-ratelimit-requests-reset:
+      - '2026-05-28T22:16:01Z'
+      anthropic-ratelimit-tokens-limit:
+      - '4800000'
+      anthropic-ratelimit-tokens-remaining:
+      - '4800000'
+      anthropic-ratelimit-tokens-reset:
+      - '2026-05-28T22:16:01Z'
+      cf-cache-status:
+      - DYNAMIC
+      content-length:
+      - '2115'
+      request-id:
+      - req_011CbVjqnNb2UteHkMVedZXS
+      set-cookie:
+      - _cfuvid=aSZ24.3ln2It1JOCCvWtZKYF8Lkiez2gjek2x0JhATg-1780006561.2384372-1.0.1.1-vBPprmL.ySy4CLNSeGi7pxkuqiIFqReIo6tRjpOWHv0;
+        HttpOnly; SameSite=None; Secure; Path=/; Domain=api.anthropic.com
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      traceresponse:
+      - 00-d30a9476347a8ebf36fdc66e9b693be3-4ada522259fede8d-01
+      vary:
+      - Accept-Encoding
+    status:
+      code: 200
+      message: OK
+version: 1
