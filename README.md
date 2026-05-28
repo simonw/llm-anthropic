@@ -44,7 +44,7 @@ Run `llm models` to list the models, and `llm models --options` to include a lis
 
 Run prompts like this:
 ```bash
-llm -m claude-opus-4.7 'Fun facts about walruses'
+llm -m claude-opus-4.8 'Fun facts about walruses'
 llm -m claude-sonnet-4.6 'Fun facts about pelicans'
 llm -m claude-haiku-4.5 'Fun facts about cormorants'
 ```

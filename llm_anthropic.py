@@ -299,6 +299,30 @@ def register_models(register):
         ),
         aliases=("claude-opus-4.7",),
     )
+    # claude-opus-4-8
+    register(
+        ClaudeMessages(
+            "claude-opus-4-8",
+            supports_pdf=True,
+            supports_thinking=True,
+            supports_thinking_effort=True,
+            supports_adaptive_thinking=True,
+            supports_web_search=True,
+            use_structured_outputs=True,
+            default_max_tokens=8192,
+        ),
+        AsyncClaudeMessages(
+            "claude-opus-4-8",
+            supports_pdf=True,
+            supports_thinking=True,
+            supports_thinking_effort=True,
+            supports_adaptive_thinking=True,
+            supports_web_search=True,
+            use_structured_outputs=True,
+            default_max_tokens=8192,
+        ),
+        aliases=("claude-opus-4.8",),
+    )
 
 
 class ClaudeOptions(llm.Options):
