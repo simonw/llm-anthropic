@@ -313,6 +313,22 @@ def test_web_search():
     assert len(response_dict["content"]) > 0
 
 
+def test_fast_mode_kwargs():
+    model = llm.get_model("claude-opus-4.8")
+    prompt = llm.Prompt("Hi", model, options=model.Options(fast=True))
+    kwargs = model.build_kwargs(prompt, None)
+    assert kwargs["speed"] == "fast"
+    assert "fast-mode-2026-02-01" in kwargs["betas"]
+
+
+def test_fast_mode_off_by_default():
+    model = llm.get_model("claude-opus-4.8")
+    prompt = llm.Prompt("Hi", model, options=model.Options())
+    kwargs = model.build_kwargs(prompt, None)
+    assert "speed" not in kwargs
+    assert "betas" not in kwargs
+
+
 @pytest.mark.vcr
 def test_opus_46_prompt():
     model = llm.get_model("claude-opus-4.6")
