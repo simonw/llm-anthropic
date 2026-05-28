@@ -135,14 +135,14 @@ def register_models(register):
             supports_pdf=True,
             supports_thinking=True,
             supports_web_search=True,
-            default_max_tokens=8192,
+            default_max_tokens=32000,
         ),
         AsyncClaudeMessages(
             "claude-opus-4-0",
             supports_pdf=True,
             supports_thinking=True,
             supports_web_search=True,
-            default_max_tokens=8192,
+            default_max_tokens=32000,
         ),
         aliases=("claude-4-opus",),
     )
@@ -152,14 +152,14 @@ def register_models(register):
             supports_pdf=True,
             supports_thinking=True,
             supports_web_search=True,
-            default_max_tokens=8192,
+            default_max_tokens=64000,
         ),
         AsyncClaudeMessages(
             "claude-sonnet-4-0",
             supports_pdf=True,
             supports_thinking=True,
             supports_web_search=True,
-            default_max_tokens=8192,
+            default_max_tokens=64000,
         ),
         aliases=("claude-4-sonnet",),
     )
@@ -170,7 +170,7 @@ def register_models(register):
             supports_thinking=True,
             supports_web_search=True,
             use_structured_outputs=True,
-            default_max_tokens=8192,
+            default_max_tokens=32000,
         ),
         AsyncClaudeMessages(
             "claude-opus-4-1-20250805",
@@ -178,7 +178,7 @@ def register_models(register):
             supports_thinking=True,
             supports_web_search=True,
             use_structured_outputs=True,
-            default_max_tokens=8192,
+            default_max_tokens=32000,
         ),
         aliases=("claude-opus-4.1",),
     )
@@ -189,14 +189,14 @@ def register_models(register):
             supports_pdf=True,
             supports_thinking=True,
             use_structured_outputs=True,
-            default_max_tokens=8192,
+            default_max_tokens=64000,
         ),
         AsyncClaudeMessages(
             "claude-sonnet-4-5",
             supports_pdf=True,
             supports_thinking=True,
             use_structured_outputs=True,
-            default_max_tokens=8192,
+            default_max_tokens=64000,
         ),
         aliases=("claude-sonnet-4.5",),
     )
@@ -224,7 +224,7 @@ def register_models(register):
             supports_thinking=True,
             supports_thinking_effort=True,
             supports_web_search=True,
-            default_max_tokens=8192,
+            default_max_tokens=64000,
         ),
         AsyncClaudeMessages(
             "claude-opus-4-5-20251101",
@@ -232,7 +232,7 @@ def register_models(register):
             supports_thinking=True,
             supports_thinking_effort=True,
             supports_web_search=True,
-            default_max_tokens=8192,
+            default_max_tokens=64000,
         ),
         aliases=("claude-opus-4.5",),
     )
@@ -246,7 +246,7 @@ def register_models(register):
             supports_adaptive_thinking=True,
             supports_web_search=True,
             use_structured_outputs=True,
-            default_max_tokens=8192,
+            default_max_tokens=128000,
         ),
         AsyncClaudeMessages(
             "claude-opus-4-6",
@@ -256,7 +256,7 @@ def register_models(register):
             supports_adaptive_thinking=True,
             supports_web_search=True,
             use_structured_outputs=True,
-            default_max_tokens=8192,
+            default_max_tokens=128000,
         ),
         aliases=("claude-opus-4.6",),
     )
@@ -270,7 +270,7 @@ def register_models(register):
             supports_adaptive_thinking=True,
             supports_web_search=True,
             use_structured_outputs=True,
-            default_max_tokens=64000,
+            default_max_tokens=128000,
         ),
         AsyncClaudeMessages(
             "claude-sonnet-4-6",
@@ -280,7 +280,7 @@ def register_models(register):
             supports_adaptive_thinking=True,
             supports_web_search=True,
             use_structured_outputs=True,
-            default_max_tokens=64000,
+            default_max_tokens=128000,
         ),
         aliases=("claude-sonnet-4.6",),
     )
@@ -318,7 +318,7 @@ def register_models(register):
             supports_adaptive_thinking=True,
             supports_web_search=True,
             use_structured_outputs=True,
-            default_max_tokens=8192,
+            default_max_tokens=128000,
         ),
         AsyncClaudeMessages(
             "claude-opus-4-8",
@@ -328,7 +328,7 @@ def register_models(register):
             supports_adaptive_thinking=True,
             supports_web_search=True,
             use_structured_outputs=True,
-            default_max_tokens=8192,
+            default_max_tokens=128000,
         ),
         aliases=("claude-opus-4.8",),
     )
