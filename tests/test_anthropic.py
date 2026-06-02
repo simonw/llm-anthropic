@@ -793,3 +793,17 @@ def test_extract_system_prefers_prompt_system_over_messages():
     model = llm.get_model("claude-sonnet-4.5")
     p = llm.Prompt(None, model=model, system="legacy sys", messages=[user("hi")])
     assert model._extract_system(p) == "legacy sys"
+
+
+def test_build_kwargs_top_p_zero_is_sent():
+    """top_p=0.0 should reach the API as top_p (greedy nucleus sampling),
+    not silently fall through to temperature. The previous truthy check
+    treated 0.0 as unset."""
+    from llm import user
+
+    model = llm.get_model("claude-sonnet-4.5")
+    options = model.Options(top_p=0.0, temperature=1.0)
+    p = llm.Prompt(None, model=model, options=options, messages=[user("hi")])
+    kwargs = model.build_kwargs(p, None)
+    assert kwargs.get("top_p") == 0.0
+    assert "temperature" not in kwargs
