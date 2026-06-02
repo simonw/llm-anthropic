@@ -800,7 +800,7 @@ class _Shared:
         if prompt.options.user_id:
             kwargs["metadata"] = {"user_id": prompt.options.user_id}
 
-        if prompt.options.top_p:
+        if prompt.options.top_p is not None:
             kwargs["top_p"] = prompt.options.top_p
         else:
             kwargs["temperature"] = (
