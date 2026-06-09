@@ -332,6 +332,30 @@ def register_models(register):
         ),
         aliases=("claude-opus-4.8",),
     )
+    # claude-fable-5
+    register(
+        ClaudeMessages(
+            "claude-fable-5",
+            supports_pdf=True,
+            supports_thinking=True,
+            supports_thinking_effort=True,
+            supports_adaptive_thinking=True,
+            supports_web_search=True,
+            use_structured_outputs=True,
+            default_max_tokens=128000,
+        ),
+        AsyncClaudeMessages(
+            "claude-fable-5",
+            supports_pdf=True,
+            supports_thinking=True,
+            supports_thinking_effort=True,
+            supports_adaptive_thinking=True,
+            supports_web_search=True,
+            use_structured_outputs=True,
+            default_max_tokens=128000,
+        ),
+        aliases=("claude-fable-5",),
+    )
 
 
 class ClaudeOptions(llm.Options):
