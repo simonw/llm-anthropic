@@ -889,13 +889,6 @@ class _Shared:
 
         # Handle effort in output_config
         if thinking_effort_enabled:
-            if prompt.options.thinking_effort == ThinkingEffort.MAX:
-                if not (
-                    self.supports_adaptive_thinking and "opus" in self.claude_model_id
-                ):
-                    raise ValueError(
-                        "thinking_effort='max' is only supported by claude-opus-4-6"
-                    )
             kwargs.setdefault("output_config", {})[
                 "effort"
             ] = prompt.options.thinking_effort.value
