@@ -356,6 +356,24 @@ def register_models(register):
         ),
         aliases=("claude-fable-5",),
     )
+    # claude-sonnet-5
+    register(
+        ClaudeMessages(
+            "claude-sonnet-5",
+            supports_pdf=True,
+            supports_thinking=True,
+            use_structured_outputs=True,
+            default_max_tokens=64000,
+        ),
+        AsyncClaudeMessages(
+            "claude-sonnet-5",
+            supports_pdf=True,
+            supports_thinking=True,
+            use_structured_outputs=True,
+            default_max_tokens=64000,
+        ),
+        aliases=("claude-sonnet-5",),
+    )
 
 
 class ClaudeOptions(llm.Options):
