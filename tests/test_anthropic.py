@@ -398,6 +398,67 @@ def test_fast_mode_off_by_default():
     assert "betas" not in kwargs
 
 
+def test_opus_5_registered():
+    model = llm.get_model("claude-opus-5")
+    assert model.model_id == "anthropic/claude-opus-5"
+    assert model.claude_model_id == "claude-opus-5"
+    assert "application/pdf" in model.attachment_types
+    assert "image/png" in model.attachment_types
+    assert model.supports_thinking
+    assert model.supports_thinking_effort
+    assert model.supports_adaptive_thinking
+    assert model.supports_web_search
+    assert model.use_structured_outputs
+    assert model.default_max_tokens == 128000
+    async_model = llm.get_async_model("claude-opus-5")
+    assert async_model.model_id == "anthropic/claude-opus-5"
+    assert async_model.claude_model_id == "claude-opus-5"
+
+
+def test_opus_5_default_kwargs():
+    model = llm.get_model("claude-opus-5")
+    prompt = llm.Prompt("Hi", model, options=model.Options())
+    kwargs = model.build_kwargs(prompt, None)
+    assert kwargs["model"] == "claude-opus-5"
+    assert kwargs["max_tokens"] == 128000
+    # Effort and 128K output are GA on Opus 5 - no beta headers needed
+    assert "betas" not in kwargs
+
+
+def test_opus_5_thinking_defaults_to_adaptive():
+    model = llm.get_model("claude-opus-5")
+    prompt = llm.Prompt("Hi", model, options=model.Options(thinking=True))
+    kwargs = model.build_kwargs(prompt, None)
+    assert kwargs["thinking"] == {"type": "adaptive"}
+
+
+@pytest.mark.parametrize("effort", ["low", "medium", "high", "xhigh", "max"])
+def test_opus_5_thinking_effort(effort):
+    model = llm.get_model("claude-opus-5")
+    prompt = llm.Prompt("Hi", model, options=model.Options(thinking_effort=effort))
+    kwargs = model.build_kwargs(prompt, None)
+    assert kwargs["thinking"] == {"type": "adaptive"}
+    assert kwargs["output_config"]["effort"] == effort
+    assert "betas" not in kwargs
+
+
+def test_opus_5_prefill_rejected():
+    model = llm.get_model("claude-opus-5")
+    model.key = "test-key"
+    with pytest.raises(
+        ValueError, match="Prefilling assistant messages is not supported"
+    ):
+        model.prompt("Hello", prefill="{").text()
+
+
+def test_opus_5_fast_mode():
+    model = llm.get_model("claude-opus-5")
+    prompt = llm.Prompt("Hi", model, options=model.Options(fast=True))
+    kwargs = model.build_kwargs(prompt, None)
+    assert kwargs["speed"] == "fast"
+    assert "fast-mode-2026-02-01" in kwargs["betas"]
+
+
 @pytest.mark.vcr
 def test_opus_46_prompt():
     model = llm.get_model("claude-opus-4.6")
@@ -458,11 +519,13 @@ def test_46_prefill_rejected():
         model.prompt("Hello", prefill="{").text()
 
 
-def test_46_max_effort_opus_only():
+def test_max_effort_passed_through():
+    # Client-side validation of effort levels was removed - the API is
+    # left to reject models that don't support a given level
     model = llm.get_model("claude-sonnet-4.6")
-    model.key = "test-key"
-    with pytest.raises(ValueError, match="thinking_effort='max' is only supported"):
-        model.prompt("Hello", thinking_effort="max").text()
+    prompt = llm.Prompt("Hello", model, options=model.Options(thinking_effort="max"))
+    kwargs = model.build_kwargs(prompt, None)
+    assert kwargs["output_config"]["effort"] == "max"
 
 
 @pytest.mark.vcr
