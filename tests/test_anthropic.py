@@ -1247,3 +1247,214 @@ def test_code_execution():
     assert container["id"].startswith("container_")
     assert isinstance(container["expires_at"], str)
     json.dumps(container)
+
+
+# --- MCP connector server-side tool ---------------------------------------
+
+
+def test_mcp_supported_server_side_tools():
+    from llm_anthropic import AnthropicMCP
+
+    model = llm.get_model("claude-sonnet-4.6")
+    assert AnthropicMCP in model.supported_server_side_tools
+    old_model = llm.get_model("claude-3-opus")
+    assert AnthropicMCP not in old_model.supported_server_side_tools
+
+
+def test_mcp_kwargs():
+    from llm_anthropic import AnthropicMCP
+
+    model = llm.get_model("claude-sonnet-4.6")
+    prompt = llm.Prompt(
+        "What does simonw/llm do?",
+        model,
+        options=model.Options(),
+        tools=[AnthropicMCP(url="https://mcp.deepwiki.com/mcp", name="deepwiki")],
+    )
+    kwargs = model.build_kwargs(prompt, None)
+    assert kwargs["tools"] == [{"type": "mcp_toolset", "mcp_server_name": "deepwiki"}]
+    assert kwargs["mcp_servers"] == [
+        {"type": "url", "url": "https://mcp.deepwiki.com/mcp", "name": "deepwiki"}
+    ]
+    assert kwargs["betas"] == ["mcp-client-2025-11-20"]
+
+
+def test_mcp_name_derived_from_url_host():
+    from llm_anthropic import AnthropicMCP
+
+    tool = AnthropicMCP(url="https://mcp.deepwiki.com/mcp")
+    assert tool.server_name == "mcp.deepwiki.com"
+
+
+def test_mcp_kwargs_authorization_token_and_allowed_tools():
+    from llm_anthropic import AnthropicMCP
+
+    model = llm.get_model("claude-sonnet-4.6")
+    prompt = llm.Prompt(
+        "Ask a question",
+        model,
+        options=model.Options(),
+        tools=[
+            AnthropicMCP(
+                url="https://mcp.example.com/mcp",
+                name="example",
+                authorization_token="secret-token",
+                allowed_tools=["ask_question", "read_wiki_structure"],
+            )
+        ],
+    )
+    kwargs = model.build_kwargs(prompt, None)
+    assert kwargs["tools"] == [
+        {
+            "type": "mcp_toolset",
+            "mcp_server_name": "example",
+            "default_config": {"enabled": False},
+            "configs": {
+                "ask_question": {"enabled": True},
+                "read_wiki_structure": {"enabled": True},
+            },
+        }
+    ]
+    assert kwargs["mcp_servers"] == [
+        {
+            "type": "url",
+            "url": "https://mcp.example.com/mcp",
+            "name": "example",
+            "authorization_token": "secret-token",
+        }
+    ]
+
+
+def test_mcp_multiple_servers_beta_appended_once():
+    from llm_anthropic import AnthropicMCP
+
+    model = llm.get_model("claude-sonnet-4.6")
+    prompt = llm.Prompt(
+        "Use both servers",
+        model,
+        options=model.Options(),
+        tools=[
+            AnthropicMCP(url="https://mcp.one.com/mcp", name="one"),
+            AnthropicMCP(url="https://mcp.two.com/mcp", name="two"),
+        ],
+    )
+    kwargs = model.build_kwargs(prompt, None)
+    assert kwargs["betas"].count("mcp-client-2025-11-20") == 1
+    assert [server["name"] for server in kwargs["mcp_servers"]] == ["one", "two"]
+    assert [tool["mcp_server_name"] for tool in kwargs["tools"]] == ["one", "two"]
+
+
+def test_mcp_validation_errors():
+    from llm_anthropic import AnthropicMCP
+
+    with pytest.raises(ValueError):
+        AnthropicMCP(url="")
+    with pytest.raises(ValueError):
+        AnthropicMCP(url="ftp://example.com/mcp")
+    with pytest.raises(ValueError):
+        AnthropicMCP(url="https://mcp.example.com/mcp", name="")
+    with pytest.raises(ValueError):
+        AnthropicMCP(url="https://mcp.example.com/mcp", allowed_tools="ask_question")
+    with pytest.raises(ValueError):
+        AnthropicMCP(url="https://mcp.example.com/mcp", allowed_tools=[""])
+
+
+def test_mcp_unsupported_model_raises():
+    from llm_anthropic import AnthropicMCP
+
+    model = llm.get_model("claude-3-opus")
+    prompt = llm.Prompt(
+        "Use the MCP server",
+        model,
+        options=model.Options(),
+        tools=[AnthropicMCP(url="https://mcp.deepwiki.com/mcp", name="deepwiki")],
+    )
+    with pytest.raises(ValueError, match="does not support server-side tool"):
+        model.build_kwargs(prompt, None)
+
+
+def test_build_messages_replays_mcp_blocks():
+    """MCP tool calls/results replay as mcp_tool_use (with the required
+    server_name field) and mcp_tool_result blocks inside the assistant
+    turn - the API rejects them in any other shape."""
+    from llm.parts import Message, TextPart, ToolCallPart, ToolResultPart
+    from llm import user
+
+    model = llm.get_model("claude-sonnet-4.6")
+    result_content = [{"type": "text", "text": "llm is a CLI tool", "citations": None}]
+    msgs = [
+        user("Use the deepwiki tools to say what simonw/llm does"),
+        Message(
+            role="assistant",
+            parts=[
+                ToolCallPart(
+                    name="ask_question",
+                    arguments={"repoName": "simonw/llm", "question": "What is it?"},
+                    tool_call_id="mcptoolu_123",
+                    server_executed=True,
+                    provider_metadata={"anthropic": {"mcp_server_name": "deepwiki"}},
+                ),
+                ToolResultPart(
+                    name="mcp",
+                    output=json.dumps(result_content),
+                    tool_call_id="mcptoolu_123",
+                    server_executed=True,
+                ),
+                TextPart(text="It is a CLI tool for LLMs"),
+            ],
+        ),
+        user("What tool did you call?"),
+    ]
+    prompt = llm.Prompt(None, model, options=model.Options(), messages=msgs)
+    messages = model.build_messages(prompt, None)
+    assert [m["role"] for m in messages] == ["user", "assistant", "user"]
+    assistant_blocks = messages[1]["content"]
+    assert [b["type"] for b in assistant_blocks] == [
+        "mcp_tool_use",
+        "mcp_tool_result",
+        "text",
+    ]
+    assert assistant_blocks[0] == {
+        "type": "mcp_tool_use",
+        "id": "mcptoolu_123",
+        "name": "ask_question",
+        "input": {"repoName": "simonw/llm", "question": "What is it?"},
+        "server_name": "deepwiki",
+    }
+    assert assistant_blocks[1]["tool_use_id"] == "mcptoolu_123"
+    assert assistant_blocks[1]["content"] == result_content
+
+
+@pytest.mark.vcr
+def test_mcp_server_side_tool():
+    from llm_anthropic import AnthropicMCP
+
+    model = llm.get_model("claude-sonnet-4.6")
+    model.key = model.key or ANTHROPIC_API_KEY
+    response = model.prompt(
+        "Use the deepwiki tools to find out what the simonw/llm repo does. "
+        "Reply in one sentence.",
+        tools=[AnthropicMCP(url="https://mcp.deepwiki.com/mcp", name="deepwiki")],
+    )
+    text = str(response)
+    assert "llm" in text.lower()
+    parts = [p for m in response.messages() for p in m.parts]
+    mcp_calls = [
+        p
+        for p in parts
+        if isinstance(p, llm.parts.ToolCallPart)
+        and (p.tool_call_id or "").startswith("mcptoolu")
+    ]
+    assert mcp_calls
+    assert mcp_calls[0].server_executed
+    assert mcp_calls[0].provider_metadata == {
+        "anthropic": {"mcp_server_name": "deepwiki"}
+    }
+    mcp_results = [
+        p
+        for p in parts
+        if isinstance(p, llm.parts.ToolResultPart)
+        and (p.tool_call_id or "").startswith("mcptoolu")
+    ]
+    assert mcp_results
+    assert mcp_results[0].server_executed

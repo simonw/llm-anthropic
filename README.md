@@ -135,6 +135,46 @@ response = model.prompt(
 print(response.text())
 ```
 
+## MCP connector
+
+Models that support web search can also call tools on remote [MCP servers](https://platform.claude.com/docs/en/agents-and-tools/mcp-connector) using the `AnthropicMCP` server-side tool. Anthropic connects to the server from their own infrastructure - it must be reachable over HTTPS:
+
+```bash
+llm -m claude-sonnet-5 \
+  -T 'AnthropicMCP(url="https://mcp.deepwiki.com/mcp", name="deepwiki")' \
+  'Use the deepwiki tools to say what simonw/llm does, one sentence'
+```
+Available arguments:
+
+- `url`: the HTTPS URL of the remote MCP server (required)
+- `name`: an identifier for the server - defaults to the URL's hostname
+- `authorization_token`: OAuth bearer token, for servers that require authentication
+- `allowed_tools`: optional list of tool names - if provided, only those tools are enabled
+
+```bash
+llm -m claude-sonnet-5 \
+  -T 'AnthropicMCP(url="https://mcp.deepwiki.com/mcp", name="deepwiki", allowed_tools=["ask_question"])' \
+  'What does simonw/llm do?'
+```
+
+You can pass multiple `MCP` tools to connect to more than one server in the same request. Only MCP tool calls are supported - not MCP resources or prompts.
+
+From Python, pass an instance of the `AnthropicMCP` class in `tools=`:
+
+```python
+import llm
+from llm_anthropic import AnthropicMCP
+
+model = llm.get_model("claude-sonnet-5")
+response = model.prompt(
+    "Use the deepwiki tools to say what simonw/llm does, one sentence",
+    tools=[AnthropicMCP(url="https://mcp.deepwiki.com/mcp", name="deepwiki")],
+)
+print(response.text())
+```
+
+This feature uses Anthropic's `mcp-client-2025-11-20` beta.
+
 ## Code execution
 
 Claude 4.5 and later models support Anthropic's [code execution tool](https://platform.claude.com/docs/en/agents-and-tools/tool-use/code-execution-tool), which runs Python and bash in a sandboxed server-side container. Use the `-T CodeExecution` server-side tool:

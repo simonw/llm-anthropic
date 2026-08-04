@@ -703,6 +703,63 @@ class WebFetch(llm.ServerSideTool):
         return spec
 
 
+class AnthropicMCP(llm.ServerSideTool):
+    """Call tools on a remote MCP server using Anthropic's MCP connector.
+
+    Anthropic connects to the MCP server from their own infrastructure -
+    the server must be reachable over HTTPS. Uses the ``mcp-client-2025-11-20``
+    beta. Only MCP tool calls are supported (not resources or prompts).
+    """
+
+    name = "mcp"
+
+    def __init__(
+        self,
+        url: str,
+        name: Optional[str] = None,
+        authorization_token: Optional[str] = None,
+        allowed_tools: Optional[List[str]] = None,
+    ):
+        super().__init__()
+        if not isinstance(url, str) or not url:
+            raise ValueError("url must be a non-empty string")
+        if not url.startswith("https://"):
+            raise ValueError("url must start with https://")
+        if name is not None and (not isinstance(name, str) or not name):
+            raise ValueError("name must be a non-empty string")
+        if authorization_token is not None and not isinstance(authorization_token, str):
+            raise ValueError("authorization_token must be a string")
+        if allowed_tools is not None:
+            if not isinstance(allowed_tools, list) or not all(
+                isinstance(tool_name, str) and tool_name for tool_name in allowed_tools
+            ):
+                raise ValueError("allowed_tools must be a list of non-empty strings")
+        self.url = url
+        self.server_name = name or urlsplit(url).hostname
+        self.authorization_token = authorization_token
+        self.allowed_tools = allowed_tools
+
+    def tool_spec(self, model):
+        spec = {"type": "mcp_toolset", "mcp_server_name": self.server_name}
+        if self.allowed_tools is not None:
+            spec["default_config"] = {"enabled": False}
+            spec["configs"] = {
+                tool_name: {"enabled": True} for tool_name in self.allowed_tools
+            }
+        return spec
+
+    def prepare_request(self, model, kwargs):
+        server = {"type": "url", "url": self.url, "name": self.server_name}
+        if self.authorization_token is not None:
+            server["authorization_token"] = self.authorization_token
+        servers = kwargs.setdefault("mcp_servers", [])
+        if not any(existing.get("name") == self.server_name for existing in servers):
+            servers.append(server)
+        betas = kwargs.setdefault("betas", [])
+        if MCP_BETA not in betas:
+            betas.append(MCP_BETA)
+
+
 class CodeExecution(llm.ServerSideTool):
     """Run Python and bash code in Anthropic's sandboxed server-side
     execution container.
@@ -807,7 +864,7 @@ class _Shared:
     def supported_server_side_tools(self):
         tools = []
         if self.supports_web_search:
-            tools += [WebSearch, WebFetch]
+            tools += [WebSearch, WebFetch, AnthropicMCP]
         if self.supports_code_execution:
             tools.append(CodeExecution)
         return tuple(tools)
@@ -909,6 +966,25 @@ class _Shared:
                 block["signature"] = sig
             return block
         if isinstance(part, ToolCallPart):
+            mcp_server_name = (
+                anthropic_pm.get("mcp_server_name")
+                if isinstance(anthropic_pm, dict)
+                else None
+            )
+            if part.server_executed and (
+                mcp_server_name or (part.tool_call_id or "").startswith("mcptoolu")
+            ):
+                # MCP connector calls replay as mcp_tool_use blocks; the
+                # API requires the server_name field to be echoed back.
+                block = {
+                    "type": "mcp_tool_use",
+                    "id": part.tool_call_id,
+                    "name": part.name,
+                    "input": part.arguments,
+                }
+                if mcp_server_name:
+                    block["server_name"] = mcp_server_name
+                return block
             return {
                 "type": "server_tool_use" if part.server_executed else "tool_use",
                 "id": part.tool_call_id,
@@ -1274,16 +1350,32 @@ class ClaudeMessages(_Shared, llm.KeyModel):
                         block_type = getattr(block, "type", None)
                         current_block_id = getattr(block, "id", None)
                         current_block_name = getattr(block, "name", None)
-                        is_server_tool = block_type == "server_tool_use" or (
-                            block_type or ""
-                        ).endswith("_tool_result")
+                        is_server_tool = block_type in (
+                            "server_tool_use",
+                            "mcp_tool_use",
+                        ) or (block_type or "").endswith("_tool_result")
 
-                        if block_type in ("tool_use", "server_tool_use"):
+                        if block_type in (
+                            "tool_use",
+                            "server_tool_use",
+                            "mcp_tool_use",
+                        ):
                             yield StreamEvent(
                                 type="tool_call_name",
                                 chunk=current_block_name or "",
                                 tool_call_id=current_block_id,
-                                server_executed=(block_type == "server_tool_use"),
+                                server_executed=(block_type != "tool_use"),
+                                provider_metadata=(
+                                    {
+                                        "anthropic": {
+                                            "mcp_server_name": getattr(
+                                                block, "server_name", None
+                                            )
+                                        }
+                                    }
+                                    if block_type == "mcp_tool_use"
+                                    else None
+                                ),
                             )
                         elif block_type and block_type.endswith("_tool_result"):
                             # Content is available inline on content_block_start
@@ -1349,18 +1441,30 @@ class ClaudeMessages(_Shared, llm.KeyModel):
                     text = (prefill_text + item.text) if prefill_text else item.text
                     prefill_text = ""  # Only prepend once
                     yield StreamEvent(type="text", chunk=text)
-                elif item_type in ("tool_use", "server_tool_use"):
+                elif item_type in ("tool_use", "server_tool_use", "mcp_tool_use"):
+                    server_executed = item_type != "tool_use"
                     yield StreamEvent(
                         type="tool_call_name",
                         chunk=item.name,
                         tool_call_id=item.id,
-                        server_executed=(item_type == "server_tool_use"),
+                        server_executed=server_executed,
+                        provider_metadata=(
+                            {
+                                "anthropic": {
+                                    "mcp_server_name": getattr(
+                                        item, "server_name", None
+                                    )
+                                }
+                            }
+                            if item_type == "mcp_tool_use"
+                            else None
+                        ),
                     )
                     yield StreamEvent(
                         type="tool_call_args",
                         chunk=json.dumps(item.input),
                         tool_call_id=item.id,
-                        server_executed=(item_type == "server_tool_use"),
+                        server_executed=server_executed,
                     )
                 elif item_type and item_type.endswith("_tool_result"):
                     yield self._server_tool_result_event(item_type, item)
@@ -1396,16 +1500,32 @@ class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
                         block_type = getattr(block, "type", None)
                         current_block_id = getattr(block, "id", None)
                         current_block_name = getattr(block, "name", None)
-                        is_server_tool = block_type == "server_tool_use" or (
-                            block_type or ""
-                        ).endswith("_tool_result")
+                        is_server_tool = block_type in (
+                            "server_tool_use",
+                            "mcp_tool_use",
+                        ) or (block_type or "").endswith("_tool_result")
 
-                        if block_type in ("tool_use", "server_tool_use"):
+                        if block_type in (
+                            "tool_use",
+                            "server_tool_use",
+                            "mcp_tool_use",
+                        ):
                             yield StreamEvent(
                                 type="tool_call_name",
                                 chunk=current_block_name or "",
                                 tool_call_id=current_block_id,
-                                server_executed=(block_type == "server_tool_use"),
+                                server_executed=(block_type != "tool_use"),
+                                provider_metadata=(
+                                    {
+                                        "anthropic": {
+                                            "mcp_server_name": getattr(
+                                                block, "server_name", None
+                                            )
+                                        }
+                                    }
+                                    if block_type == "mcp_tool_use"
+                                    else None
+                                ),
                             )
                         elif block_type and block_type.endswith("_tool_result"):
                             yield self._server_tool_result_event(block_type, block)
@@ -1466,18 +1586,30 @@ class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
                     text = (prefill_text + item.text) if prefill_text else item.text
                     prefill_text = ""
                     yield StreamEvent(type="text", chunk=text)
-                elif item_type in ("tool_use", "server_tool_use"):
+                elif item_type in ("tool_use", "server_tool_use", "mcp_tool_use"):
+                    server_executed = item_type != "tool_use"
                     yield StreamEvent(
                         type="tool_call_name",
                         chunk=item.name,
                         tool_call_id=item.id,
-                        server_executed=(item_type == "server_tool_use"),
+                        server_executed=server_executed,
+                        provider_metadata=(
+                            {
+                                "anthropic": {
+                                    "mcp_server_name": getattr(
+                                        item, "server_name", None
+                                    )
+                                }
+                            }
+                            if item_type == "mcp_tool_use"
+                            else None
+                        ),
                     )
                     yield StreamEvent(
                         type="tool_call_args",
                         chunk=json.dumps(item.input),
                         tool_call_id=item.id,
-                        server_executed=(item_type == "server_tool_use"),
+                        server_executed=server_executed,
                     )
                 elif item_type and item_type.endswith("_tool_result"):
                     yield self._server_tool_result_event(item_type, item)

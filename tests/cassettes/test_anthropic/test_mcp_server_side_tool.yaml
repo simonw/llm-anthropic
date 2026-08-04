@@ -1,0 +1,194 @@
+interactions:
+- request:
+    body: '{"max_tokens":128000,"messages":[{"role":"user","content":[{"type":"text","text":"Use
+      the deepwiki tools to find out what the simonw/llm repo does. Reply in one sentence."}]}],"model":"claude-sonnet-4-6","mcp_servers":[{"type":"url","url":"https://mcp.deepwiki.com/mcp","name":"deepwiki"}],"temperature":1.0,"tools":[{"type":"mcp_toolset","mcp_server_name":"deepwiki"}],"stream":true}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      anthropic-beta:
+      - mcp-client-2025-11-20
+      anthropic-version:
+      - '2023-06-01'
+      connection:
+      - keep-alive
+      content-length:
+      - '384'
+      content-type:
+      - application/json
+      host:
+      - api.anthropic.com
+      user-agent:
+      - Anthropic/Python 0.120.2
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-helper-method:
+      - stream
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 0.120.2
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.14.3
+      x-stainless-stream-helper:
+      - beta.messages
+      x-stainless-timeout:
+      - NOT_GIVEN
+    method: POST
+    uri: https://api.anthropic.com/v1/messages?beta=true
+  response:
+    body:
+      string: "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"model\":\"claude-sonnet-4-6\",\"id\":\"msg_011CdiPLDTXJznH4KWHARyGG\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[],\"stop_reason\":null,\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":852,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":0},\"output_tokens\":67,\"service_tier\":\"standard\",\"inference_geo\":\"global\"}}
+        \  }\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"mcp_tool_use\",\"id\":\"mcptoolu_01PbkkWTpLrWH9wKk6kbgE4K\",\"name\":\"read_wiki_structure\",\"input\":{},\"server_name\":\"deepwiki\"}
+        \        }\n\nevent: ping\ndata: {\"type\": \"ping\"}\n\nevent: content_block_delta\ndata:
+        {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"\"}
+        \  }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{\\\"repoName\"}
+        \      }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"\\\":
+        \\\"simonw\"}     }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"/llm\\\"}\"}
+        \      }\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0
+        \           }\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":1,\"content_block\":{\"type\":\"mcp_tool_result\",\"tool_use_id\":\"mcptoolu_01PbkkWTpLrWH9wKk6kbgE4K\",\"is_error\":false,\"content\":[{\"type\":\"text\",\"text\":\"Available
+        pages for simonw/llm:\\n\\n- 1 Overview\\n  - 1.1 Installation and Setup\\n
+        \ - 1.2 System Architecture\\n- 2 Command Line Interface\\n  - 2.1 Basic Usage
+        and Commands\\n  - 2.2 Interactive Chat Interface\\n  - 2.3 Configuration
+        Management\\n  - 2.4 Complete Command Reference\\n- 3 Model System\\n  - 3.1
+        Model Classes and Abstractions\\n  - 3.2 OpenAI Integration\\n  - 3.3 Model
+        Configuration and Aliases\\n- 4 Plugin System\\n  - 4.1 Plugin Ecosystem\\n
+        \ - 4.2 Plugin Development\\n- 5 Advanced Features\\n  - 5.1 Tool System and
+        Function Calling\\n  - 5.2 Template System\\n  - 5.3 Schema System and Structured
+        Output\\n  - 5.4 Fragments and Attachments\\n- 6 Data Management\\n  - 6.1
+        Logging System and Database Schema\\n  - 6.2 Embedding System\\n  - 6.3 Configuration
+        Files\\n- 7 Python API\\n  - 7.1 Core API Functions\\n  - 7.2 Model Interaction
+        and Responses\\n  - 7.3 Advanced API Usage\"}]}        }\n\nevent: content_block_stop\ndata:
+        {\"type\":\"content_block_stop\",\"index\":1}\n\nevent: content_block_start\ndata:
+        {\"type\":\"content_block_start\",\"index\":2,\"content_block\":{\"type\":\"mcp_tool_use\",\"id\":\"mcptoolu_01BgcC6M6UBMRDveiriX3fhy\",\"name\":\"ask_question\",\"input\":{},\"server_name\":\"deepwiki\"}
+        \     }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":2,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"\"}
+        \      }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":2,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{\\\"repoN\"}
+        \           }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":2,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"ame\\\"\"}
+        \     }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":2,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\":
+        \\\"sim\"}          }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":2,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"onw/llm\\\"\"}
+        \       }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":2,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\",
+        \\\"question\\\"\"}  }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":2,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\":
+        \\\"What \"}    }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":2,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"does
+        thi\"}}\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":2,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"s
+        rep\"}       }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":2,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"ository
+        do? \"}          }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":2,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"Give\"}
+        \   }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":2,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"
+        a brief \"} }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":2,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"summa\"}
+        \          }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":2,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"ry.\\\"}\"}
+        \    }\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":2
+        \           }\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":3,\"content_block\":{\"type\":\"mcp_tool_result\",\"tool_use_id\":\"mcptoolu_01BgcC6M6UBMRDveiriX3fhy\",\"is_error\":false,\"content\":[{\"type\":\"text\",\"text\":\"This
+        repository, `simonw/llm`, provides a command-line interface (CLI) tool and
+        a Python library for interacting with various Large Language Models (LLMs)
+        from providers like OpenAI, Anthropic, and Google, as well as local models
+        \ . It allows you to run prompts, manage API keys, store interactions in SQLite
+        databases, generate embeddings, and extend functionality through a plugin
+        system  .\\n\\n## Core Functionality\\n\\nThe `llm` tool offers several key
+        features:\\n*   **Prompt Execution**: You can run prompts directly from the
+        command line  or programmatically using the Python API .\\n*   **Model Support**:
+        It supports a wide range of models, including those from OpenAI, Anthropic,
+        Google, and local models, with extensibility for others via plugins  .\\n*
+        \  **Data Storage**: All interactions, including prompts and responses, are
+        persistently logged to SQLite databases (`logs.db`)  . It also supports generating
+        and storing embeddings in `embeddings.db`  .\\n*   **Plugin System**: A robust
+        plugin system allows for extending the tool's capabilities by adding new models,
+        embedding models, tools, CLI commands, and template/fragment loaders .\\n*
+        \  **Tools and Schemas**: LLM enables models to execute Python functions as
+        \\\"tools\\\"  and supports structured output extraction using schemas .\\n*
+        \  **Conversations**: The tool facilitates multi-turn conversations with models
+        .\\n\\n## Installation and Usage\\nYou can install LLM using `pip`, Homebrew,
+        `pipx`, or `uv` . After installation, you can set up API keys for various
+        providers  and start interacting with models from your terminal .\\n\\n##
+        Notes\\nThe `pyproject.toml` file  provides metadata about the project, including
+        its name (`llm`), version (`0.28`), description, authors, license, and dependencies
+        . The `README.md`  and `docs/index.md`  files serve as the primary documentation
+        for the project, outlining its features and providing quick start guides.
+        The `docs/changelog.md`  details the version history and new features.\\n\\nWiki
+        pages you might want to explore:\\n- [Overview (simonw/llm)](/wiki/simonw/llm#1)\\n-
+        [Plugin System (simonw/llm)](/wiki/simonw/llm#4)\\n\\nView this search on
+        DeepWiki: https://deepwiki.com/search/what-does-this-repository-do-g_67761f78-e713-4d47-aee8-ab29a2708ac1\\n\"}]}
+        \            }\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":3
+        \             }\n\nevent: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":4,\"content_block\":{\"type\":\"text\",\"text\":\"\"}
+        \  }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":4,\"delta\":{\"type\":\"text_delta\",\"text\":\"**\"}
+        \           }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":4,\"delta\":{\"type\":\"text_delta\",\"text\":\"`simonw/llm`**
+        is a CLI tool and Python library that lets you interact with a wide variety
+        of Large Language Models (LLMs) \u2014\"}              }\n\nevent: content_block_delta\ndata:
+        {\"type\":\"content_block_delta\",\"index\":4,\"delta\":{\"type\":\"text_delta\",\"text\":\"
+        from providers like OpenAI, Anthropic, and Google, as well as local models
+        \u2014 with features like prompt execution, multi-turn conversations, persistent\"}
+        \ }\n\nevent: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":4,\"delta\":{\"type\":\"text_delta\",\"text\":\"
+        logging to SQLite, embeddings, structured output, and an extensible plugin
+        system.\"}            }\n\nevent: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":4}\n\nevent:
+        message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\",\"stop_sequence\":null,\"stop_details\":null},\"usage\":{\"input_tokens\":4007,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0,\"output_tokens\":245,\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0}}
+        \    }\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"
+    headers:
+      anthropic-organization-id:
+      - b320df16-c763-4455-b901-3f7d54e9a012
+      anthropic-ratelimit-input-tokens-limit:
+      - '10000000'
+      anthropic-ratelimit-input-tokens-remaining:
+      - '10000000'
+      anthropic-ratelimit-input-tokens-reset:
+      - '2026-08-04T21:03:41Z'
+      anthropic-ratelimit-output-tokens-limit:
+      - '2000000'
+      anthropic-ratelimit-output-tokens-remaining:
+      - '2000000'
+      anthropic-ratelimit-output-tokens-reset:
+      - '2026-08-04T21:03:41Z'
+      anthropic-ratelimit-requests-limit:
+      - '20000'
+      anthropic-ratelimit-requests-remaining:
+      - '19999'
+      anthropic-ratelimit-requests-reset:
+      - '2026-08-04T21:03:41Z'
+      anthropic-ratelimit-tokens-limit:
+      - '12000000'
+      anthropic-ratelimit-tokens-remaining:
+      - '12000000'
+      anthropic-ratelimit-tokens-reset:
+      - '2026-08-04T21:03:41Z'
+      cache-control:
+      - no-cache
+      cf-cache-status:
+      - DYNAMIC
+      cf-ray:
+      - a26082929d21eb22-SJC
+      connection:
+      - keep-alive
+      content-length:
+      - '8882'
+      content-security-policy:
+      - default-src 'none'; frame-ancestors 'none'
+      content-type:
+      - text/event-stream; charset=utf-8
+      date:
+      - Tue, 04 Aug 2026 21:03:43 GMT
+      request-id:
+      - req_011CdiPL3D8by8uPrjJpzehe
+      server:
+      - cloudflare
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      traceresponse:
+      - 00-fd1ddb7f23f4ad743a65ef94f6dda520-c6b003f16e51cd9e-01
+      transfer-encoding:
+      - chunked
+      vary:
+      - Accept-Encoding
+      x-robots-tag:
+      - none
+    status:
+      code: 200
+      message: OK
+version: 1
