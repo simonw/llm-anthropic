@@ -135,6 +135,21 @@ response = model.prompt(
 print(response.text())
 ```
 
+## Code execution
+
+Claude 4.5 and later models support Anthropic's [code execution tool](https://platform.claude.com/docs/en/agents-and-tools/tool-use/code-execution-tool), which runs Python and bash in a sandboxed server-side container. Use the `-T CodeExecution` server-side tool:
+
+```bash
+llm -m claude-sonnet-4.6 -T CodeExecution \
+  'Compute the sha256 hex digest of the string "pelican"'
+```
+Each response that runs code reports a container ID in its `response_json`, visible with `llm logs --json`. Pass that ID back to reuse the container's files and state in a later prompt (containers expire after a period of inactivity):
+
+```bash
+llm -m claude-sonnet-4.6 -T 'CodeExecution(container="container_011CPd...")' \
+  'Read /tmp/results.csv and summarize it'
+```
+
 ## Fast mode
 
 Some models support [fast mode](https://platform.claude.com/docs/en/build-with-claude/fast-mode) for lower latency responses. Enable it with the `-o fast 1` option:

@@ -13,10 +13,12 @@ from llm.parts import (
 )
 import json
 from typing import Any, Dict, Optional, List
+from urllib.parse import urlsplit
 from pydantic import Field, field_validator, model_validator
 
 DEFAULT_THINKING_TOKENS = 1024
 DEFAULT_TEMPERATURE = 1.0
+MCP_BETA = "mcp-client-2025-11-20"
 
 
 class ThinkingEffort(str, enum.Enum):
@@ -190,6 +192,7 @@ def register_models(register):
             supports_pdf=True,
             supports_thinking=True,
             supports_web_search=True,
+            supports_code_execution=True,
             use_structured_outputs=True,
             default_max_tokens=64000,
         ),
@@ -198,6 +201,7 @@ def register_models(register):
             supports_pdf=True,
             supports_thinking=True,
             supports_web_search=True,
+            supports_code_execution=True,
             use_structured_outputs=True,
             default_max_tokens=64000,
         ),
@@ -210,6 +214,7 @@ def register_models(register):
             supports_pdf=True,
             supports_thinking=True,
             supports_web_search=True,
+            supports_code_execution=True,
             default_max_tokens=64000,
         ),
         AsyncClaudeMessages(
@@ -217,6 +222,7 @@ def register_models(register):
             supports_pdf=True,
             supports_thinking=True,
             supports_web_search=True,
+            supports_code_execution=True,
             default_max_tokens=64000,
         ),
         aliases=("claude-haiku-4.5",),
@@ -229,6 +235,7 @@ def register_models(register):
             supports_thinking=True,
             supports_thinking_effort=True,
             supports_web_search=True,
+            supports_code_execution=True,
             default_max_tokens=64000,
         ),
         AsyncClaudeMessages(
@@ -237,6 +244,7 @@ def register_models(register):
             supports_thinking=True,
             supports_thinking_effort=True,
             supports_web_search=True,
+            supports_code_execution=True,
             default_max_tokens=64000,
         ),
         aliases=("claude-opus-4.5",),
@@ -250,6 +258,7 @@ def register_models(register):
             supports_thinking_effort=True,
             supports_adaptive_thinking=True,
             supports_web_search=True,
+            supports_code_execution=True,
             use_structured_outputs=True,
             default_max_tokens=128000,
         ),
@@ -260,6 +269,7 @@ def register_models(register):
             supports_thinking_effort=True,
             supports_adaptive_thinking=True,
             supports_web_search=True,
+            supports_code_execution=True,
             use_structured_outputs=True,
             default_max_tokens=128000,
         ),
@@ -274,6 +284,7 @@ def register_models(register):
             supports_thinking_effort=True,
             supports_adaptive_thinking=True,
             supports_web_search=True,
+            supports_code_execution=True,
             use_structured_outputs=True,
             default_max_tokens=128000,
         ),
@@ -284,6 +295,7 @@ def register_models(register):
             supports_thinking_effort=True,
             supports_adaptive_thinking=True,
             supports_web_search=True,
+            supports_code_execution=True,
             use_structured_outputs=True,
             default_max_tokens=128000,
         ),
@@ -298,6 +310,7 @@ def register_models(register):
             supports_thinking_effort=True,
             supports_adaptive_thinking=True,
             supports_web_search=True,
+            supports_code_execution=True,
             use_structured_outputs=True,
             default_max_tokens=128000,
         ),
@@ -308,6 +321,7 @@ def register_models(register):
             supports_thinking_effort=True,
             supports_adaptive_thinking=True,
             supports_web_search=True,
+            supports_code_execution=True,
             use_structured_outputs=True,
             default_max_tokens=128000,
         ),
@@ -322,6 +336,7 @@ def register_models(register):
             supports_thinking_effort=True,
             supports_adaptive_thinking=True,
             supports_web_search=True,
+            supports_code_execution=True,
             use_structured_outputs=True,
             default_max_tokens=128000,
         ),
@@ -332,6 +347,7 @@ def register_models(register):
             supports_thinking_effort=True,
             supports_adaptive_thinking=True,
             supports_web_search=True,
+            supports_code_execution=True,
             use_structured_outputs=True,
             default_max_tokens=128000,
         ),
@@ -346,6 +362,7 @@ def register_models(register):
             supports_thinking_effort=True,
             supports_adaptive_thinking=True,
             supports_web_search=True,
+            supports_code_execution=True,
             use_structured_outputs=True,
             default_max_tokens=128000,
         ),
@@ -356,6 +373,7 @@ def register_models(register):
             supports_thinking_effort=True,
             supports_adaptive_thinking=True,
             supports_web_search=True,
+            supports_code_execution=True,
             use_structured_outputs=True,
             default_max_tokens=128000,
         ),
@@ -370,6 +388,7 @@ def register_models(register):
             supports_thinking_effort=True,
             supports_adaptive_thinking=True,
             supports_web_search=True,
+            supports_code_execution=True,
             use_structured_outputs=True,
             default_max_tokens=128000,
         ),
@@ -380,6 +399,7 @@ def register_models(register):
             supports_thinking_effort=True,
             supports_adaptive_thinking=True,
             supports_web_search=True,
+            supports_code_execution=True,
             use_structured_outputs=True,
             default_max_tokens=128000,
         ),
@@ -394,6 +414,7 @@ def register_models(register):
             supports_thinking_effort=True,
             supports_adaptive_thinking=True,
             supports_web_search=True,
+            supports_code_execution=True,
             use_structured_outputs=True,
             default_max_tokens=128000,
         ),
@@ -404,6 +425,7 @@ def register_models(register):
             supports_thinking_effort=True,
             supports_adaptive_thinking=True,
             supports_web_search=True,
+            supports_code_execution=True,
             use_structured_outputs=True,
             default_max_tokens=128000,
         ),
@@ -681,6 +703,31 @@ class WebFetch(llm.ServerSideTool):
         return spec
 
 
+class CodeExecution(llm.ServerSideTool):
+    """Run Python and bash code in Anthropic's sandboxed server-side
+    execution container.
+
+    Pass an existing container ID as ``container`` to reuse the files and
+    state from a previous response - the container ID is available in the
+    logged response JSON.
+    """
+
+    name = "code_execution"
+
+    def __init__(self, container: Optional[str] = None):
+        super().__init__()
+        if container is not None and not isinstance(container, str):
+            raise ValueError("container must be a string container ID")
+        self.container = container
+
+    def tool_spec(self, model):
+        return {"type": "code_execution_20260521", "name": "code_execution"}
+
+    def prepare_request(self, model, kwargs):
+        if self.container is not None:
+            kwargs["container"] = self.container
+
+
 def source_for_attachment(attachment):
     if attachment.url:
         return {
@@ -707,6 +754,7 @@ class _Shared:
     supports_schema = True
     supports_tools = True
     supports_web_search = False
+    supports_code_execution = False
     default_max_tokens = 4096
 
     class Options(ClaudeOptions): ...
@@ -721,6 +769,7 @@ class _Shared:
         supports_thinking_effort=False,
         supports_adaptive_thinking=False,
         supports_web_search=False,
+        supports_code_execution=False,
         use_structured_outputs=False,
         default_max_tokens=None,
         base_url=None,
@@ -752,12 +801,16 @@ class _Shared:
         if default_max_tokens is not None:
             self.default_max_tokens = default_max_tokens
         self.supports_web_search = supports_web_search
+        self.supports_code_execution = supports_code_execution
 
     @property
     def supported_server_side_tools(self):
+        tools = []
         if self.supports_web_search:
-            return (WebSearch, WebFetch)
-        return ()
+            tools += [WebSearch, WebFetch]
+        if self.supports_code_execution:
+            tools.append(CodeExecution)
+        return tuple(tools)
 
     def prefill_text(self, prompt):
         if prompt.options.prefill and not prompt.options.hide_prefill:
@@ -792,6 +845,26 @@ class _Shared:
             server_executed=True,
             tool_name=block_type.removesuffix("_tool_result"),
         )
+
+    def _apply_container(self, message_dict, container):
+        """Store the code execution container on the response JSON.
+
+        Streaming needs this patched in from the message_delta event -
+        the SDK's get_final_message() accumulator drops it - and in both
+        modes the datetime expires_at must become a JSON-safe string.
+        """
+        if container is None:
+            container = message_dict.get("container")
+        if container is None:
+            return
+        if hasattr(container, "model_dump"):
+            container = container.model_dump(mode="json")
+        else:
+            container = {
+                key: value.isoformat() if hasattr(value, "isoformat") else value
+                for key, value in container.items()
+            }
+        message_dict["container"] = container
 
     def _model_dump_suppress_warnings(self, message):
         """
@@ -1190,6 +1263,7 @@ class ClaudeMessages(_Shared, llm.KeyModel):
                 current_block_id = None
                 current_block_name = None
                 is_server_tool = False
+                container = None
 
                 if prefill_text:
                     yield StreamEvent(type="text", chunk=prefill_text)
@@ -1239,10 +1313,18 @@ class ClaudeMessages(_Shared, llm.KeyModel):
                                 server_executed=is_server_tool,
                             )
 
+                    elif chunk.type == "message_delta":
+                        chunk_container = getattr(chunk, "container", None) or getattr(
+                            getattr(chunk, "delta", None), "container", None
+                        )
+                        if chunk_container is not None:
+                            container = chunk_container
+
                 # This records usage and other data:
                 last_message = self._model_dump_suppress_warnings(
                     stream_obj.get_final_message()
                 )
+                self._apply_container(last_message, container)
                 response.response_json = last_message
 
                 if self.add_tool_usage(response, last_message):
@@ -1283,6 +1365,7 @@ class ClaudeMessages(_Shared, llm.KeyModel):
                 elif item_type and item_type.endswith("_tool_result"):
                     yield self._server_tool_result_event(item_type, item)
             response.response_json = completion.model_dump()
+            self._apply_container(response.response_json, None)
             self.add_tool_usage(response, response.response_json)
         self.set_usage(response)
 
@@ -1302,6 +1385,7 @@ class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
                 current_block_id = None
                 current_block_name = None
                 is_server_tool = False
+                container = None
 
                 if prefill_text:
                     yield StreamEvent(type="text", chunk=prefill_text)
@@ -1350,9 +1434,17 @@ class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
                                 server_executed=is_server_tool,
                             )
 
+                    elif chunk.type == "message_delta":
+                        chunk_container = getattr(chunk, "container", None) or getattr(
+                            getattr(chunk, "delta", None), "container", None
+                        )
+                        if chunk_container is not None:
+                            container = chunk_container
+
             response.response_json = self._model_dump_suppress_warnings(
                 await stream_obj.get_final_message()
             )
+            self._apply_container(response.response_json, container)
 
             self.add_tool_usage(response, response.response_json)
         else:
@@ -1390,5 +1482,6 @@ class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
                 elif item_type and item_type.endswith("_tool_result"):
                     yield self._server_tool_result_event(item_type, item)
             response.response_json = completion.model_dump()
+            self._apply_container(response.response_json, None)
             self.add_tool_usage(response, response.response_json)
         self.set_usage(response)

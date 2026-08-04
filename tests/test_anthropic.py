@@ -1149,3 +1149,101 @@ def test_web_search_server_side_tool():
     ]
     assert search_calls
     assert search_calls[0].server_executed
+
+
+# --- CodeExecution server-side tool ---------------------------------------
+
+
+def test_code_execution_supported_server_side_tools():
+    from llm_anthropic import CodeExecution
+
+    for model_id in ("claude-sonnet-4.6", "claude-haiku-4.5", "claude-opus-5"):
+        model = llm.get_model(model_id)
+        assert CodeExecution in model.supported_server_side_tools
+    # Web search capable but too old for code execution
+    old_model = llm.get_model("claude-opus-4.1")
+    assert old_model.supports_web_search
+    assert CodeExecution not in old_model.supported_server_side_tools
+
+
+def test_code_execution_kwargs():
+    from llm_anthropic import CodeExecution
+
+    model = llm.get_model("claude-sonnet-4.6")
+    prompt = llm.Prompt(
+        "Compute something",
+        model,
+        options=model.Options(),
+        tools=[CodeExecution()],
+    )
+    kwargs = model.build_kwargs(prompt, None)
+    assert kwargs["tools"] == [
+        {"type": "code_execution_20260521", "name": "code_execution"}
+    ]
+    assert "container" not in kwargs
+
+
+def test_code_execution_container_reuse_kwargs():
+    from llm_anthropic import CodeExecution
+
+    model = llm.get_model("claude-sonnet-4.6")
+    prompt = llm.Prompt(
+        "Compute something",
+        model,
+        options=model.Options(),
+        tools=[CodeExecution(container="cntr_123")],
+    )
+    kwargs = model.build_kwargs(prompt, None)
+    assert kwargs["container"] == "cntr_123"
+
+
+def test_code_execution_invalid_container():
+    from llm_anthropic import CodeExecution
+
+    with pytest.raises(ValueError):
+        CodeExecution(container=123)
+
+
+def test_code_execution_unsupported_model_raises():
+    from llm_anthropic import CodeExecution
+
+    model = llm.get_model("claude-opus-4.1")
+    prompt = llm.Prompt(
+        "Compute something", model, options=model.Options(), tools=[CodeExecution()]
+    )
+    with pytest.raises(ValueError, match="does not support server-side tool"):
+        model.build_kwargs(prompt, None)
+
+
+@pytest.mark.vcr
+def test_code_execution():
+    from llm_anthropic import CodeExecution
+
+    model = llm.get_model("claude-sonnet-4.6")
+    model.key = model.key or ANTHROPIC_API_KEY
+    response = model.prompt(
+        "Use code execution to compute 123456789 * 987654321 exactly. "
+        "Reply with just the number.",
+        tools=[CodeExecution()],
+    )
+    assert "121932631112635269" in str(response)
+    parts = [p for m in response.messages() for p in m.parts]
+    exec_calls = [
+        p
+        for p in parts
+        if isinstance(p, llm.parts.ToolCallPart) and "code_execution" in p.name
+    ]
+    assert exec_calls
+    assert exec_calls[0].server_executed
+    exec_results = [
+        p
+        for p in parts
+        if isinstance(p, llm.parts.ToolResultPart) and "code_execution" in p.name
+    ]
+    assert exec_results
+    # Container ID must survive streaming (the SDK accumulator drops it)
+    # and be JSON-serializable
+    container = response.response_json["container"]
+    assert container["id"].startswith("container_")
+    assert isinstance(container["expires_at"], str)
+    json.dumps(container)
