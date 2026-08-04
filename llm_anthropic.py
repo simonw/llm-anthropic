@@ -1,6 +1,7 @@
 from anthropic import Anthropic, AsyncAnthropic, transform_schema
 import enum
 import llm
+from llm.models import _partition_tools
 from llm.parts import (
     AttachmentPart,
     Message,
@@ -188,6 +189,7 @@ def register_models(register):
             "claude-sonnet-4-5",
             supports_pdf=True,
             supports_thinking=True,
+            supports_web_search=True,
             use_structured_outputs=True,
             default_max_tokens=64000,
         ),
@@ -195,6 +197,7 @@ def register_models(register):
             "claude-sonnet-4-5",
             supports_pdf=True,
             supports_thinking=True,
+            supports_web_search=True,
             use_structured_outputs=True,
             default_max_tokens=64000,
         ),
@@ -206,12 +209,14 @@ def register_models(register):
             "claude-haiku-4-5-20251001",
             supports_pdf=True,
             supports_thinking=True,
+            supports_web_search=True,
             default_max_tokens=64000,
         ),
         AsyncClaudeMessages(
             "claude-haiku-4-5-20251001",
             supports_pdf=True,
             supports_thinking=True,
+            supports_web_search=True,
             default_max_tokens=64000,
         ),
         aliases=("claude-haiku-4.5",),
@@ -362,15 +367,21 @@ def register_models(register):
             "claude-sonnet-5",
             supports_pdf=True,
             supports_thinking=True,
+            supports_thinking_effort=True,
+            supports_adaptive_thinking=True,
+            supports_web_search=True,
             use_structured_outputs=True,
-            default_max_tokens=64000,
+            default_max_tokens=128000,
         ),
         AsyncClaudeMessages(
             "claude-sonnet-5",
             supports_pdf=True,
             supports_thinking=True,
+            supports_thinking_effort=True,
+            supports_adaptive_thinking=True,
+            supports_web_search=True,
             use_structured_outputs=True,
-            default_max_tokens=64000,
+            default_max_tokens=128000,
         ),
         aliases=("claude-sonnet-5",),
     )
@@ -590,6 +601,87 @@ class ClaudeOptionsWithThinkingEffort(ClaudeOptionsWithThinking):
     )
 
 
+class WebFetch(llm.ServerSideTool):
+    """Fetch the full contents of a URL using Anthropic's server-side web
+    fetch tool.
+
+    Claude can only fetch URLs that already appear in the conversation -
+    provided by the user or returned by a previous web search or fetch.
+    On Claude 4.6 and later models this uses ``web_fetch_20260318`` with
+    dynamic content filtering; older models use ``web_fetch_20250910``.
+    """
+
+    name = "web_fetch"
+
+    def __init__(
+        self,
+        max_uses: Optional[int] = None,
+        allowed_domains: Optional[List[str]] = None,
+        blocked_domains: Optional[List[str]] = None,
+        citations: bool = False,
+        max_content_tokens: Optional[int] = None,
+        use_cache: Optional[bool] = None,
+    ):
+        super().__init__()
+        if max_uses is not None and (
+            isinstance(max_uses, bool) or not isinstance(max_uses, int) or max_uses < 1
+        ):
+            raise ValueError("max_uses must be a positive integer")
+        if allowed_domains is not None and blocked_domains is not None:
+            raise ValueError("Cannot specify both allowed_domains and blocked_domains")
+        for name, domains in (
+            ("allowed_domains", allowed_domains),
+            ("blocked_domains", blocked_domains),
+        ):
+            if domains is None:
+                continue
+            if not isinstance(domains, list) or not all(
+                isinstance(domain, str) and domain for domain in domains
+            ):
+                raise ValueError(f"{name} must be a list of non-empty strings")
+        if not isinstance(citations, bool):
+            raise ValueError("citations must be a boolean")
+        if max_content_tokens is not None and (
+            isinstance(max_content_tokens, bool)
+            or not isinstance(max_content_tokens, int)
+            or max_content_tokens < 1
+        ):
+            raise ValueError("max_content_tokens must be a positive integer")
+        if use_cache is not None and not isinstance(use_cache, bool):
+            raise ValueError("use_cache must be a boolean")
+        self.max_uses = max_uses
+        self.allowed_domains = allowed_domains
+        self.blocked_domains = blocked_domains
+        self.citations = citations
+        self.max_content_tokens = max_content_tokens
+        self.use_cache = use_cache
+
+    def tool_spec(self, model):
+        modern = getattr(model, "supports_adaptive_thinking", False)
+        if self.use_cache is not None and not modern:
+            raise ValueError(
+                f"use_cache is not supported by model {model.model_id} - "
+                "it requires a Claude 4.6 or later model"
+            )
+        spec = {
+            "type": "web_fetch_20260318" if modern else "web_fetch_20250910",
+            "name": "web_fetch",
+        }
+        if self.max_uses is not None:
+            spec["max_uses"] = self.max_uses
+        if self.allowed_domains is not None:
+            spec["allowed_domains"] = list(self.allowed_domains)
+        if self.blocked_domains is not None:
+            spec["blocked_domains"] = list(self.blocked_domains)
+        if self.citations:
+            spec["citations"] = {"enabled": True}
+        if self.max_content_tokens is not None:
+            spec["max_content_tokens"] = self.max_content_tokens
+        if self.use_cache is not None:
+            spec["use_cache"] = self.use_cache
+        return spec
+
+
 def source_for_attachment(attachment):
     if attachment.url:
         return {
@@ -662,10 +754,45 @@ class _Shared:
             self.default_max_tokens = default_max_tokens
         self.supports_web_search = supports_web_search
 
+    @property
+    def supported_server_side_tools(self):
+        if self.supports_web_search:
+            return (WebFetch,)
+        return ()
+
     def prefill_text(self, prompt):
         if prompt.options.prefill and not prompt.options.hide_prefill:
             return prompt.options.prefill
         return ""
+
+    def _server_tool_result_event(self, block_type, block) -> StreamEvent:
+        """Build a tool_result StreamEvent from a server tool result block.
+
+        web_search_tool_result content is a list of result blocks;
+        web_fetch_tool_result content is a single result object.
+        """
+        content = getattr(block, "content", None)
+        if isinstance(content, list):
+            result_text = (
+                json.dumps(
+                    [b if isinstance(b, dict) else b.model_dump() for b in content]
+                )
+                if content
+                else ""
+            )
+        elif content is None:
+            result_text = ""
+        else:
+            result_text = json.dumps(
+                content if isinstance(content, dict) else content.model_dump()
+            )
+        return StreamEvent(
+            type="tool_result",
+            chunk=result_text,
+            tool_call_id=getattr(block, "tool_use_id", None),
+            server_executed=True,
+            tool_name=block_type.removesuffix("_tool_result"),
+        )
 
     def _model_dump_suppress_warnings(self, message):
         """
@@ -711,12 +838,27 @@ class _Shared:
             return block
         if isinstance(part, ToolCallPart):
             return {
-                "type": "tool_use",
+                "type": "server_tool_use" if part.server_executed else "tool_use",
                 "id": part.tool_call_id,
                 "name": part.name,
                 "input": part.arguments,
             }
         if isinstance(part, ToolResultPart):
+            if part.server_executed:
+                # Reconstruct the provider result block that arrived in the
+                # assistant turn (e.g. web_fetch_tool_result) - the API
+                # rejects plain tool_result blocks in assistant messages.
+                try:
+                    content = json.loads(part.output) if part.output else None
+                except ValueError:
+                    content = part.output
+                block = {
+                    "type": part.name + "_tool_result",
+                    "tool_use_id": part.tool_call_id,
+                }
+                if content is not None:
+                    block["content"] = content
+                return block
             return {
                 "type": "tool_result",
                 "tool_use_id": part.tool_call_id,
@@ -1020,7 +1162,10 @@ class _Shared:
             )
             kwargs["tool_choice"] = {"type": "tool", "name": "output_structured_data"}
 
+        server_side_tools = []
         if prompt.tools:
+            function_tools, server_side_tools = _partition_tools(self, prompt.tools)
+            tools.extend(tool.tool_spec(self) for tool in server_side_tools)
             tools.extend(
                 [
                     {
@@ -1028,12 +1173,15 @@ class _Shared:
                         "description": tool.description or "",
                         "input_schema": tool.input_schema,
                     }
-                    for tool in prompt.tools
+                    for tool in function_tools
                 ]
             )
 
         if tools:
             kwargs["tools"] = tools
+
+        for tool in server_side_tools:
+            tool.prepare_request(self, kwargs)
 
         return kwargs
 
@@ -1090,10 +1238,9 @@ class ClaudeMessages(_Shared, llm.KeyModel):
                         block_type = getattr(block, "type", None)
                         current_block_id = getattr(block, "id", None)
                         current_block_name = getattr(block, "name", None)
-                        is_server_tool = block_type in (
-                            "server_tool_use",
-                            "web_search_tool_result",
-                        )
+                        is_server_tool = block_type == "server_tool_use" or (
+                            block_type or ""
+                        ).endswith("_tool_result")
 
                         if block_type in ("tool_use", "server_tool_use"):
                             yield StreamEvent(
@@ -1102,26 +1249,9 @@ class ClaudeMessages(_Shared, llm.KeyModel):
                                 tool_call_id=current_block_id,
                                 server_executed=(block_type == "server_tool_use"),
                             )
-                        elif block_type == "web_search_tool_result":
+                        elif block_type and block_type.endswith("_tool_result"):
                             # Content is available inline on content_block_start
-                            tool_use_id = getattr(block, "tool_use_id", None)
-                            result_content = getattr(block, "content", [])
-                            if result_content:
-                                result_text = json.dumps(
-                                    [
-                                        b if isinstance(b, dict) else b.model_dump()
-                                        for b in result_content
-                                    ]
-                                )
-                            else:
-                                result_text = ""
-                            yield StreamEvent(
-                                type="tool_result",
-                                chunk=result_text,
-                                tool_call_id=tool_use_id,
-                                server_executed=True,
-                                tool_name="web_search",
-                            )
+                            yield self._server_tool_result_event(block_type, block)
 
                     elif chunk.type == "content_block_delta":
                         delta = chunk.delta
@@ -1188,25 +1318,8 @@ class ClaudeMessages(_Shared, llm.KeyModel):
                         tool_call_id=item.id,
                         server_executed=(item_type == "server_tool_use"),
                     )
-                elif item_type == "web_search_tool_result":
-                    result_content = getattr(item, "content", [])
-                    result_text = (
-                        json.dumps(
-                            [
-                                block if isinstance(block, dict) else block.model_dump()
-                                for block in result_content
-                            ]
-                        )
-                        if result_content
-                        else ""
-                    )
-                    yield StreamEvent(
-                        type="tool_result",
-                        chunk=result_text,
-                        tool_call_id=getattr(item, "tool_use_id", None),
-                        server_executed=True,
-                        tool_name="web_search",
-                    )
+                elif item_type and item_type.endswith("_tool_result"):
+                    yield self._server_tool_result_event(item_type, item)
             response.response_json = completion.model_dump()
             self.add_tool_usage(response, response.response_json)
         self.set_usage(response)
@@ -1237,10 +1350,9 @@ class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
                         block_type = getattr(block, "type", None)
                         current_block_id = getattr(block, "id", None)
                         current_block_name = getattr(block, "name", None)
-                        is_server_tool = block_type in (
-                            "server_tool_use",
-                            "web_search_tool_result",
-                        )
+                        is_server_tool = block_type == "server_tool_use" or (
+                            block_type or ""
+                        ).endswith("_tool_result")
 
                         if block_type in ("tool_use", "server_tool_use"):
                             yield StreamEvent(
@@ -1249,25 +1361,8 @@ class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
                                 tool_call_id=current_block_id,
                                 server_executed=(block_type == "server_tool_use"),
                             )
-                        elif block_type == "web_search_tool_result":
-                            tool_use_id = getattr(block, "tool_use_id", None)
-                            result_content = getattr(block, "content", [])
-                            if result_content:
-                                result_text = json.dumps(
-                                    [
-                                        b if isinstance(b, dict) else b.model_dump()
-                                        for b in result_content
-                                    ]
-                                )
-                            else:
-                                result_text = ""
-                            yield StreamEvent(
-                                type="tool_result",
-                                chunk=result_text,
-                                tool_call_id=tool_use_id,
-                                server_executed=True,
-                                tool_name="web_search",
-                            )
+                        elif block_type and block_type.endswith("_tool_result"):
+                            yield self._server_tool_result_event(block_type, block)
 
                     elif chunk.type == "content_block_delta":
                         delta = chunk.delta
@@ -1330,25 +1425,8 @@ class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
                         tool_call_id=item.id,
                         server_executed=(item_type == "server_tool_use"),
                     )
-                elif item_type == "web_search_tool_result":
-                    result_content = getattr(item, "content", [])
-                    result_text = (
-                        json.dumps(
-                            [
-                                block if isinstance(block, dict) else block.model_dump()
-                                for block in result_content
-                            ]
-                        )
-                        if result_content
-                        else ""
-                    )
-                    yield StreamEvent(
-                        type="tool_result",
-                        chunk=result_text,
-                        tool_call_id=getattr(item, "tool_use_id", None),
-                        server_executed=True,
-                        tool_name="web_search",
-                    )
+                elif item_type and item_type.endswith("_tool_result"):
+                    yield self._server_tool_result_event(item_type, item)
             response.response_json = completion.model_dump()
             self.add_tool_usage(response, response.response_json)
         self.set_usage(response)

@@ -416,9 +416,7 @@ def test_opus_5_registered():
 
 def test_opus_5_kwargs():
     model = llm.get_model("claude-opus-5")
-    prompt = llm.Prompt(
-        "Hi", model, options=model.Options(thinking_effort="max")
-    )
+    prompt = llm.Prompt("Hi", model, options=model.Options(thinking_effort="max"))
     kwargs = model.build_kwargs(prompt, None)
     assert kwargs["model"] == "claude-opus-5"
     assert kwargs["max_tokens"] == 128000
@@ -840,3 +838,223 @@ def test_extract_system_prefers_prompt_system_over_messages():
     model = llm.get_model("claude-sonnet-4.5")
     p = llm.Prompt(None, model=model, system="legacy sys", messages=[user("hi")])
     assert model._extract_system(p) == "legacy sys"
+
+
+# --- WebFetch server-side tool --------------------------------------------
+
+
+def test_web_fetch_supported_server_side_tools():
+    from llm_anthropic import WebFetch
+
+    model = llm.get_model("claude-sonnet-4.6")
+    assert WebFetch in model.supported_server_side_tools
+    # Models without web search support don't claim WebFetch either
+    old_model = llm.get_model("claude-3-opus")
+    assert WebFetch not in old_model.supported_server_side_tools
+
+
+def test_web_fetch_kwargs():
+    from llm_anthropic import WebFetch
+
+    model = llm.get_model("claude-sonnet-4.6")
+    prompt = llm.Prompt(
+        "Fetch https://www.example.com/",
+        model,
+        options=model.Options(),
+        tools=[
+            WebFetch(
+                max_uses=3,
+                allowed_domains=["example.com"],
+                citations=True,
+                max_content_tokens=5000,
+            )
+        ],
+    )
+    kwargs = model.build_kwargs(prompt, None)
+    assert kwargs["tools"] == [
+        {
+            "type": "web_fetch_20260318",
+            "name": "web_fetch",
+            "max_uses": 3,
+            "allowed_domains": ["example.com"],
+            "citations": {"enabled": True},
+            "max_content_tokens": 5000,
+        }
+    ]
+
+
+def test_web_fetch_kwargs_basic_version_on_older_model():
+    from llm_anthropic import WebFetch
+
+    model = llm.get_model("claude-opus-4.1")
+    prompt = llm.Prompt(
+        "Fetch https://www.example.com/",
+        model,
+        options=model.Options(),
+        tools=[WebFetch()],
+    )
+    kwargs = model.build_kwargs(prompt, None)
+    assert kwargs["tools"] == [{"type": "web_fetch_20250910", "name": "web_fetch"}]
+
+
+def test_web_fetch_use_cache_requires_newer_model():
+    from llm_anthropic import WebFetch
+
+    model = llm.get_model("claude-opus-4.1")
+    prompt = llm.Prompt(
+        "Fetch https://www.example.com/",
+        model,
+        options=model.Options(),
+        tools=[WebFetch(use_cache=False)],
+    )
+    with pytest.raises(ValueError):
+        model.build_kwargs(prompt, None)
+    # Fine on a 4.6 model
+    model46 = llm.get_model("claude-sonnet-4.6")
+    prompt46 = llm.Prompt(
+        "Fetch https://www.example.com/",
+        model46,
+        options=model46.Options(),
+        tools=[WebFetch(use_cache=False)],
+    )
+    kwargs = model46.build_kwargs(prompt46, None)
+    assert kwargs["tools"][0]["use_cache"] is False
+
+
+def test_web_fetch_unsupported_model_raises():
+    from llm_anthropic import WebFetch
+
+    model = llm.get_model("claude-3-opus")
+    prompt = llm.Prompt(
+        "Fetch https://www.example.com/",
+        model,
+        options=model.Options(),
+        tools=[WebFetch()],
+    )
+    with pytest.raises(ValueError, match="does not support server-side tool"):
+        model.build_kwargs(prompt, None)
+
+
+def test_web_fetch_alongside_client_tools_kwargs():
+    from llm_anthropic import WebFetch
+
+    model = llm.get_model("claude-sonnet-4.6")
+    prompt = llm.Prompt(
+        "Fetch and report version",
+        model,
+        options=model.Options(),
+        tools=[WebFetch(max_uses=1), fixed_version_tool()],
+    )
+    kwargs = model.build_kwargs(prompt, None)
+    types_and_names = [(tool.get("type"), tool.get("name")) for tool in kwargs["tools"]]
+    assert ("web_fetch_20260318", "web_fetch") in types_and_names
+    assert (None, "fixed_version") in types_and_names
+
+
+@pytest.mark.vcr
+def test_web_fetch():
+    from llm_anthropic import WebFetch
+
+    model = llm.get_model("claude-sonnet-4.6")
+    model.key = model.key or ANTHROPIC_API_KEY
+    response = model.prompt(
+        "Fetch https://www.example.com/ and quote the first sentence of the page",
+        tools=[WebFetch(max_uses=1)],
+    )
+    text = str(response)
+    assert "example" in text.lower()
+    # Server-executed tool call and result should be captured as parts.
+    # Dynamic filtering means the model may also make code_execution
+    # server tool calls around the fetch itself.
+    parts = [p for m in response.messages() for p in m.parts]
+    tool_calls = [p for p in parts if isinstance(p, llm.parts.ToolCallPart)]
+    web_fetch_calls = [p for p in tool_calls if p.name == "web_fetch"]
+    assert web_fetch_calls
+    assert web_fetch_calls[0].server_executed
+    fetch_results = []
+    for part in parts:
+        if not isinstance(part, llm.parts.ToolResultPart) or not part.output:
+            continue
+        try:
+            data = json.loads(part.output)
+        except ValueError:
+            continue
+        if isinstance(data, dict) and data.get("type") == "web_fetch_result":
+            fetch_results.append(data)
+    assert fetch_results
+    assert fetch_results[0]["url"] == "https://www.example.com/"
+
+
+def test_build_messages_replays_server_tool_blocks():
+    """Server-executed tool calls/results replay as server_tool_use and
+    provider result blocks inside the assistant turn - not as client
+    tool_use/tool_result blocks, which the API rejects."""
+    from llm.parts import Message, TextPart, ToolCallPart, ToolResultPart
+    from llm import user
+
+    model = llm.get_model("claude-sonnet-4.6")
+    result_payload = {
+        "type": "web_fetch_result",
+        "url": "https://www.example.com/",
+        "content": {"type": "document"},
+    }
+    msgs = [
+        user("Fetch https://www.example.com/ and tell me its title"),
+        Message(
+            role="assistant",
+            parts=[
+                ToolCallPart(
+                    name="web_fetch",
+                    arguments={"url": "https://www.example.com/"},
+                    tool_call_id="srvtoolu_123",
+                    server_executed=True,
+                ),
+                ToolResultPart(
+                    name="web_fetch",
+                    output=json.dumps(result_payload),
+                    tool_call_id="srvtoolu_123",
+                    server_executed=True,
+                ),
+                TextPart(text="The title is Example Domain"),
+            ],
+        ),
+        user("What domain was that page on?"),
+    ]
+    prompt = llm.Prompt(None, model, options=model.Options(), messages=msgs)
+    messages = model.build_messages(prompt, None)
+    assert [m["role"] for m in messages] == ["user", "assistant", "user"]
+    assistant_blocks = messages[1]["content"]
+    assert [b["type"] for b in assistant_blocks] == [
+        "server_tool_use",
+        "web_fetch_tool_result",
+        "text",
+    ]
+    assert assistant_blocks[0]["name"] == "web_fetch"
+    assert assistant_blocks[0]["id"] == "srvtoolu_123"
+    assert assistant_blocks[1]["tool_use_id"] == "srvtoolu_123"
+    assert assistant_blocks[1]["content"] == result_payload
+
+
+def test_sonnet_and_haiku_4_5_support_web_search():
+    from llm_anthropic import WebFetch
+
+    for model_id in ("claude-sonnet-4.5", "claude-haiku-4.5"):
+        model = llm.get_model(model_id)
+        assert model.supports_web_search
+        assert WebFetch in model.supported_server_side_tools
+
+
+def test_sonnet_5_registered():
+    model = llm.get_model("claude-sonnet-5")
+    assert model.model_id == "anthropic/claude-sonnet-5"
+    assert model.claude_model_id == "claude-sonnet-5"
+    assert "application/pdf" in model.attachment_types
+    assert model.supports_thinking
+    assert model.supports_thinking_effort
+    assert model.supports_adaptive_thinking
+    assert model.supports_web_search
+    assert model.use_structured_outputs
+    assert model.default_max_tokens == 128000
+    async_model = llm.get_async_model("claude-sonnet-5")
+    assert async_model.supports_web_search
+    assert async_model.default_max_tokens == 128000
