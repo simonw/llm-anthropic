@@ -368,8 +368,10 @@ def test_fixed_version_tool_chain_with_thinking_display_regression():
 def test_web_search():
     model = llm.get_model("claude-opus-4.1")
     model.key = model.key or ANTHROPIC_API_KEY
+    from llm_anthropic import WebSearch
+
     response = model.prompt(
-        "What is the current weather in San Francisco?", web_search=True
+        "What is the current weather in San Francisco?", tools=[WebSearch()]
     )
     response_text = str(response)
     assert len(response_text) > 0
@@ -579,8 +581,10 @@ def test_web_search_tool_result_ordering():
     """web_search_tool_result parts appear BEFORE the text that uses them."""
     model = llm.get_model("claude-opus-4.1")
     model.key = model.key or ANTHROPIC_API_KEY
+    from llm_anthropic import WebSearch
+
     response = model.prompt(
-        "What is the current weather in San Francisco?", web_search=True
+        "What is the current weather in San Francisco?", tools=[WebSearch()]
     )
     events = list(response.stream_events())
 
@@ -1058,3 +1062,90 @@ def test_sonnet_5_registered():
     async_model = llm.get_async_model("claude-sonnet-5")
     assert async_model.supports_web_search
     assert async_model.default_max_tokens == 128000
+
+
+# --- WebSearch server-side tool -------------------------------------------
+
+
+def test_web_search_tool_supported_server_side_tools():
+    from llm_anthropic import WebSearch
+
+    model = llm.get_model("claude-sonnet-4.6")
+    assert WebSearch in model.supported_server_side_tools
+    old_model = llm.get_model("claude-3-opus")
+    assert WebSearch not in old_model.supported_server_side_tools
+
+
+def test_web_search_tool_kwargs():
+    from llm_anthropic import WebSearch
+
+    model = llm.get_model("claude-sonnet-4.6")
+    prompt = llm.Prompt(
+        "What is the weather in London?",
+        model,
+        options=model.Options(),
+        tools=[
+            WebSearch(
+                max_uses=2,
+                allowed_domains=["example.com"],
+                user_location={"city": "London", "country": "GB"},
+            )
+        ],
+    )
+    kwargs = model.build_kwargs(prompt, None)
+    assert kwargs["tools"] == [
+        {
+            "type": "web_search_20260318",
+            "name": "web_search",
+            "max_uses": 2,
+            "allowed_domains": ["example.com"],
+            "user_location": {
+                "type": "approximate",
+                "city": "London",
+                "country": "GB",
+            },
+        }
+    ]
+
+
+def test_web_search_tool_kwargs_basic_version_on_older_model():
+    from llm_anthropic import WebSearch
+
+    model = llm.get_model("claude-opus-4.1")
+    prompt = llm.Prompt(
+        "Search the web", model, options=model.Options(), tools=[WebSearch()]
+    )
+    kwargs = model.build_kwargs(prompt, None)
+    assert kwargs["tools"] == [{"type": "web_search_20250305", "name": "web_search"}]
+
+
+def test_web_search_tool_domain_conflict():
+    from llm_anthropic import WebSearch
+
+    with pytest.raises(ValueError):
+        WebSearch(allowed_domains=["a.com"], blocked_domains=["b.com"])
+
+
+@pytest.mark.vcr
+def test_web_search_server_side_tool():
+    from llm_anthropic import WebSearch
+
+    model = llm.get_model("claude-sonnet-4.6")
+    model.key = model.key or ANTHROPIC_API_KEY
+    response = model.prompt(
+        "What is the current weather in San Francisco?",
+        tools=[WebSearch(max_uses=2)],
+    )
+    text = str(response)
+    assert any(
+        word in text.lower()
+        for word in ["weather", "temperature", "san francisco", "degree", "forecast"]
+    )
+    parts = [p for m in response.messages() for p in m.parts]
+    search_calls = [
+        p
+        for p in parts
+        if isinstance(p, llm.parts.ToolCallPart) and p.name == "web_search"
+    ]
+    assert search_calls
+    assert search_calls[0].server_executed

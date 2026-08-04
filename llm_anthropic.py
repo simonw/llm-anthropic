@@ -464,31 +464,6 @@ class ClaudeOptions(llm.Options):
         default=None,
     )
 
-    web_search: Optional[bool] = Field(
-        description="Enable web search capabilities",
-        default=None,
-    )
-
-    web_search_max_uses: Optional[int] = Field(
-        description="Maximum number of web searches to perform per request",
-        default=None,
-    )
-
-    web_search_allowed_domains: Optional[List[str]] = Field(
-        description="List of domains to restrict web searches to",
-        default=None,
-    )
-
-    web_search_blocked_domains: Optional[List[str]] = Field(
-        description="List of domains to exclude from web searches",
-        default=None,
-    )
-
-    web_search_location: Optional[dict] = Field(
-        description="User location for localizing search results (dict with city, region, country, timezone)",
-        default=None,
-    )
-
     @field_validator("stop_sequences")
     def validate_stop_sequences(cls, stop_sequences):
         error_msg = "stop_sequences must be a list of strings or a single string"
@@ -530,49 +505,10 @@ class ClaudeOptions(llm.Options):
             raise ValueError("top_k must be a positive integer")
         return top_k
 
-    @field_validator("web_search_max_uses")
-    @classmethod
-    def validate_web_search_max_uses(cls, max_uses):
-        if max_uses is not None and max_uses <= 0:
-            raise ValueError("web_search_max_uses must be a positive integer")
-        return max_uses
-
-    @field_validator("web_search_allowed_domains", "web_search_blocked_domains")
-    @classmethod
-    def validate_web_search_domains(cls, domains):
-        if domains is not None:
-            if not isinstance(domains, list):
-                raise ValueError("web_search domains must be a list of strings")
-            if not all(isinstance(domain, str) for domain in domains):
-                raise ValueError("web_search domains must be a list of strings")
-        return domains
-
-    @field_validator("web_search_location")
-    @classmethod
-    def validate_web_search_location(cls, location):
-        if location is not None:
-            if not isinstance(location, dict):
-                raise ValueError("web_search_location must be a dictionary")
-            required_fields = {"city", "region", "country", "timezone"}
-            if not all(field in location for field in required_fields):
-                raise ValueError(f"web_search_location must contain: {required_fields}")
-        return location
-
     @model_validator(mode="after")
     def validate_temperature_top_p(self):
         if self.temperature != 1.0 and self.top_p is not None:
             raise ValueError("Only one of temperature and top_p can be set")
-        return self
-
-    @model_validator(mode="after")
-    def validate_web_search_domains_conflict(self):
-        if (
-            self.web_search_allowed_domains is not None
-            and self.web_search_blocked_domains is not None
-        ):
-            raise ValueError(
-                "Cannot use both web_search_allowed_domains and web_search_blocked_domains"
-            )
         return self
 
 
@@ -601,6 +537,83 @@ class ClaudeOptionsWithThinkingEffort(ClaudeOptionsWithThinking):
     )
 
 
+def _validate_max_uses(max_uses):
+    if max_uses is not None and (
+        isinstance(max_uses, bool) or not isinstance(max_uses, int) or max_uses < 1
+    ):
+        raise ValueError("max_uses must be a positive integer")
+
+
+def _validate_domain_filters(allowed_domains, blocked_domains):
+    if allowed_domains is not None and blocked_domains is not None:
+        raise ValueError("Cannot specify both allowed_domains and blocked_domains")
+    for name, domains in (
+        ("allowed_domains", allowed_domains),
+        ("blocked_domains", blocked_domains),
+    ):
+        if domains is None:
+            continue
+        if not isinstance(domains, list) or not all(
+            isinstance(domain, str) and domain for domain in domains
+        ):
+            raise ValueError(f"{name} must be a list of non-empty strings")
+
+
+class WebSearch(llm.ServerSideTool):
+    """Search the web using Anthropic's server-side web search tool.
+
+    On Claude 4.6 and later models this uses ``web_search_20260318`` with
+    dynamic content filtering; older models use ``web_search_20250305``.
+    """
+
+    name = "web_search"
+
+    def __init__(
+        self,
+        max_uses: Optional[int] = None,
+        allowed_domains: Optional[List[str]] = None,
+        blocked_domains: Optional[List[str]] = None,
+        user_location: Optional[dict] = None,
+    ):
+        super().__init__()
+        _validate_max_uses(max_uses)
+        _validate_domain_filters(allowed_domains, blocked_domains)
+        if user_location is not None:
+            if not isinstance(user_location, dict):
+                raise ValueError("user_location must be a dictionary")
+            allowed_keys = {"type", "city", "region", "country", "timezone"}
+            invalid_keys = set(user_location.keys()) - allowed_keys
+            if invalid_keys:
+                raise ValueError(
+                    f"user_location contains invalid keys: {invalid_keys}. "
+                    f"Allowed keys: {allowed_keys}"
+                )
+            user_location = dict(user_location)
+            user_location.setdefault("type", "approximate")
+            if user_location["type"] != "approximate":
+                raise ValueError("user_location type must be approximate")
+        self.max_uses = max_uses
+        self.allowed_domains = allowed_domains
+        self.blocked_domains = blocked_domains
+        self.user_location = user_location
+
+    def tool_spec(self, model):
+        modern = getattr(model, "supports_adaptive_thinking", False)
+        spec = {
+            "type": "web_search_20260318" if modern else "web_search_20250305",
+            "name": "web_search",
+        }
+        if self.max_uses is not None:
+            spec["max_uses"] = self.max_uses
+        if self.allowed_domains is not None:
+            spec["allowed_domains"] = list(self.allowed_domains)
+        if self.blocked_domains is not None:
+            spec["blocked_domains"] = list(self.blocked_domains)
+        if self.user_location is not None:
+            spec["user_location"] = dict(self.user_location)
+        return spec
+
+
 class WebFetch(llm.ServerSideTool):
     """Fetch the full contents of a URL using Anthropic's server-side web
     fetch tool.
@@ -623,22 +636,8 @@ class WebFetch(llm.ServerSideTool):
         use_cache: Optional[bool] = None,
     ):
         super().__init__()
-        if max_uses is not None and (
-            isinstance(max_uses, bool) or not isinstance(max_uses, int) or max_uses < 1
-        ):
-            raise ValueError("max_uses must be a positive integer")
-        if allowed_domains is not None and blocked_domains is not None:
-            raise ValueError("Cannot specify both allowed_domains and blocked_domains")
-        for name, domains in (
-            ("allowed_domains", allowed_domains),
-            ("blocked_domains", blocked_domains),
-        ):
-            if domains is None:
-                continue
-            if not isinstance(domains, list) or not all(
-                isinstance(domain, str) and domain for domain in domains
-            ):
-                raise ValueError(f"{name} must be a list of non-empty strings")
+        _validate_max_uses(max_uses)
+        _validate_domain_filters(allowed_domains, blocked_domains)
         if not isinstance(citations, bool):
             raise ValueError("citations must be a boolean")
         if max_content_tokens is not None and (
@@ -757,7 +756,7 @@ class _Shared:
     @property
     def supported_server_side_tools(self):
         if self.supports_web_search:
-            return (WebFetch,)
+            return (WebSearch, WebFetch)
         return ()
 
     def prefill_text(self, prompt):
@@ -997,15 +996,6 @@ class _Shared:
                 "llm-anthropic does not yet support using both schema and tools in the same prompt"
             )
 
-        # Validate web search support
-        if prompt.options.web_search and not self.supports_web_search:
-            raise ValueError(
-                f"Web search is not supported by model {self.model_id}. "
-                f"Supported models include: claude-3.5-sonnet-latest, claude-3.5-haiku-latest, "
-                f"claude-3.7-sonnet-latest, claude-4-opus, claude-4-sonnet, claude-opus-4.1, "
-                f"claude-opus-4.6, claude-sonnet-4.6"
-            )
-
         kwargs = {
             "model": self.claude_model_id,
             "messages": self.build_messages(prompt, conversation),
@@ -1123,34 +1113,6 @@ class _Shared:
             kwargs["betas"] = betas
 
         tools = []
-
-        # Add web search tool if enabled
-        if prompt.options.web_search:
-            web_search_tool = {
-                "type": "web_search_20250305",
-                "name": "web_search",
-            }
-
-            # Add optional web search parameters
-            if prompt.options.web_search_max_uses:
-                web_search_tool["max_uses"] = prompt.options.web_search_max_uses
-
-            if prompt.options.web_search_allowed_domains:
-                web_search_tool["allowed_domains"] = (
-                    prompt.options.web_search_allowed_domains
-                )
-
-            if prompt.options.web_search_blocked_domains:
-                web_search_tool["blocked_domains"] = (
-                    prompt.options.web_search_blocked_domains
-                )
-
-            if prompt.options.web_search_location:
-                location = prompt.options.web_search_location.copy()
-                location["type"] = "approximate"  # Required by API
-                web_search_tool["user_location"] = location
-
-            tools.append(web_search_tool)
 
         if prompt.schema and not use_structured_outputs:
             # Fall back to tools workaround for models that don't support structured outputs
