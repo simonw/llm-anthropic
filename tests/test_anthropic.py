@@ -398,6 +398,35 @@ def test_fast_mode_off_by_default():
     assert "betas" not in kwargs
 
 
+def test_opus_5_registered():
+    model = llm.get_model("claude-opus-5")
+    assert model.model_id == "anthropic/claude-opus-5"
+    assert model.claude_model_id == "claude-opus-5"
+    assert "application/pdf" in model.attachment_types
+    assert model.supports_thinking
+    assert model.supports_thinking_effort
+    assert model.supports_adaptive_thinking
+    assert model.supports_web_search
+    assert model.use_structured_outputs
+    assert model.default_max_tokens == 128000
+    async_model = llm.get_async_model("claude-opus-5")
+    assert async_model.model_id == "anthropic/claude-opus-5"
+    assert async_model.claude_model_id == "claude-opus-5"
+
+
+def test_opus_5_kwargs():
+    model = llm.get_model("claude-opus-5")
+    prompt = llm.Prompt(
+        "Hi", model, options=model.Options(thinking_effort="max")
+    )
+    kwargs = model.build_kwargs(prompt, None)
+    assert kwargs["model"] == "claude-opus-5"
+    assert kwargs["max_tokens"] == 128000
+    assert kwargs["thinking"] == {"type": "adaptive"}
+    assert kwargs["output_config"]["effort"] == "max"
+    assert "betas" not in kwargs
+
+
 @pytest.mark.vcr
 def test_opus_46_prompt():
     model = llm.get_model("claude-opus-4.6")
@@ -458,11 +487,13 @@ def test_46_prefill_rejected():
         model.prompt("Hello", prefill="{").text()
 
 
-def test_46_max_effort_opus_only():
+def test_max_effort_passed_through():
+    # Client-side validation of effort levels was removed - the API is
+    # left to reject models that don't support a given level
     model = llm.get_model("claude-sonnet-4.6")
-    model.key = "test-key"
-    with pytest.raises(ValueError, match="thinking_effort='max' is only supported"):
-        model.prompt("Hello", thinking_effort="max").text()
+    prompt = llm.Prompt("Hello", model, options=model.Options(thinking_effort="max"))
+    kwargs = model.build_kwargs(prompt, None)
+    assert kwargs["output_config"]["effort"] == "max"
 
 
 @pytest.mark.vcr
