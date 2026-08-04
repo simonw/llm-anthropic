@@ -358,6 +358,8 @@ def register_models(register):
         ClaudeMessages(
             "claude-fable-5",
             supports_pdf=True,
+            thinks_by_default=True,
+            always_thinks=True,
             supports_thinking=True,
             supports_thinking_effort=True,
             supports_adaptive_thinking=True,
@@ -369,6 +371,8 @@ def register_models(register):
         AsyncClaudeMessages(
             "claude-fable-5",
             supports_pdf=True,
+            thinks_by_default=True,
+            always_thinks=True,
             supports_thinking=True,
             supports_thinking_effort=True,
             supports_adaptive_thinking=True,
@@ -384,6 +388,7 @@ def register_models(register):
         ClaudeMessages(
             "claude-sonnet-5",
             supports_pdf=True,
+            thinks_by_default=True,
             supports_thinking=True,
             supports_thinking_effort=True,
             supports_adaptive_thinking=True,
@@ -395,6 +400,7 @@ def register_models(register):
         AsyncClaudeMessages(
             "claude-sonnet-5",
             supports_pdf=True,
+            thinks_by_default=True,
             supports_thinking=True,
             supports_thinking_effort=True,
             supports_adaptive_thinking=True,
@@ -410,6 +416,7 @@ def register_models(register):
         ClaudeMessages(
             "claude-opus-5",
             supports_pdf=True,
+            thinks_by_default=True,
             supports_thinking=True,
             supports_thinking_effort=True,
             supports_adaptive_thinking=True,
@@ -421,6 +428,7 @@ def register_models(register):
         AsyncClaudeMessages(
             "claude-opus-5",
             supports_pdf=True,
+            thinks_by_default=True,
             supports_thinking=True,
             supports_thinking_effort=True,
             supports_adaptive_thinking=True,
@@ -536,25 +544,17 @@ class ClaudeOptions(llm.Options):
 
 class ClaudeOptionsWithThinking(ClaudeOptions):
     thinking: bool | None = Field(
-        description="Enable thinking mode",
-        default=None,
-    )
-    thinking_budget: int | None = Field(
-        description="Number of tokens to budget for thinking", default=None
-    )
-    thinking_display: bool | None = Field(
-        description="Request summarized thinking output (available in --json logs)",
-        default=None,
-    )
-    thinking_adaptive: bool | None = Field(
-        description='Force adaptive thinking mode (sends thinking={"type": "adaptive"})',
+        description=(
+            "Enable thinking mode. Claude 5 models think by default - "
+            "set to false to disable thinking on models that allow it"
+        ),
         default=None,
     )
 
 
 class ClaudeOptionsWithThinkingEffort(ClaudeOptionsWithThinking):
     thinking_effort: ThinkingEffort | None = Field(
-        description="Level of thinking effort to apply: low, medium, or high",
+        description="Level of thinking effort to apply: low, medium, high, xhigh or max",
         default=None,
     )
 
@@ -812,6 +812,8 @@ class _Shared:
     supports_tools = True
     supports_web_search = False
     supports_code_execution = False
+    thinks_by_default = False
+    always_thinks = False
     default_max_tokens = 4096
 
     class Options(ClaudeOptions): ...
@@ -827,6 +829,8 @@ class _Shared:
         supports_adaptive_thinking=False,
         supports_web_search=False,
         supports_code_execution=False,
+        thinks_by_default=False,
+        always_thinks=False,
         use_structured_outputs=False,
         default_max_tokens=None,
         base_url=None,
@@ -859,6 +863,8 @@ class _Shared:
             self.default_max_tokens = default_max_tokens
         self.supports_web_search = supports_web_search
         self.supports_code_execution = supports_code_execution
+        self.thinks_by_default = thinks_by_default
+        self.always_thinks = always_thinks
 
     @property
     def supported_server_side_tools(self):
@@ -1175,40 +1181,38 @@ class _Shared:
             self.supports_thinking_effort and prompt.options.thinking_effort
         )
 
-        # Determine if thinking should be activated
-        thinking_requested = False
+        # Thinking: Claude 5 models think by default (adaptive mode);
+        # older models only think when it is explicitly requested.
         if self.supports_thinking:
-            thinking_requested = (
-                prompt.options.thinking
-                or prompt.options.thinking_budget
-                or prompt.options.thinking_display
-                or prompt.options.thinking_adaptive
-                or thinking_effort_enabled
-            )
-
-        if self.supports_thinking and thinking_requested:
-            prompt.options.thinking = True
-            if prompt.options.thinking_adaptive or thinking_effort_enabled:
+            hide_reasoning = getattr(prompt, "hide_reasoning", False)
+            if prompt.options.thinking is False:
+                if self.always_thinks:
+                    raise ValueError(
+                        f"Thinking cannot be disabled for model {self.model_id}"
+                    )
+                kwargs["thinking"] = {"type": "disabled"}
+            elif prompt.options.thinking or thinking_effort_enabled:
+                if self.supports_adaptive_thinking or thinking_effort_enabled:
+                    kwargs["thinking"] = {"type": "adaptive"}
+                else:
+                    # Pre-4.6 models: enabled with default budget
+                    kwargs["thinking"] = {
+                        "type": "enabled",
+                        "budget_tokens": DEFAULT_THINKING_TOKENS,
+                    }
+            elif self.thinks_by_default and hide_reasoning:
+                # No thinking option set, but the model will think anyway -
+                # send the param explicitly so display can be omitted below
                 kwargs["thinking"] = {"type": "adaptive"}
-            elif prompt.options.thinking_budget:
-                # Explicit budget = manual mode (deprecated on 4.6 but still works)
-                kwargs["thinking"] = {
-                    "type": "enabled",
-                    "budget_tokens": prompt.options.thinking_budget,
-                }
-            elif self.supports_adaptive_thinking:
-                # 4.6 models default to adaptive thinking
-                kwargs["thinking"] = {"type": "adaptive"}
-            else:
-                # Pre-4.6 models: enabled with default budget
-                budget_tokens = DEFAULT_THINKING_TOKENS
-                kwargs["thinking"] = {
-                    "type": "enabled",
-                    "budget_tokens": budget_tokens,
-                }
 
-            if prompt.options.thinking_display:
-                kwargs["thinking"]["display"] = "summarized"
+            if (
+                hide_reasoning
+                and "thinking" in kwargs
+                and kwargs["thinking"]["type"] != "disabled"
+            ):
+                # -R / hide_reasoning=True asks the API to leave the
+                # thinking trace out of the response entirely
+                kwargs["thinking"]["display"] = "omitted"
 
         # Handle effort in output_config
         if thinking_effort_enabled:
@@ -1219,12 +1223,6 @@ class _Shared:
         max_tokens = self.default_max_tokens
         if prompt.options.max_tokens is not None:
             max_tokens = prompt.options.max_tokens
-        if (
-            self.supports_thinking
-            and prompt.options.thinking_budget is not None
-            and prompt.options.thinking_budget > max_tokens
-        ):
-            max_tokens = prompt.options.thinking_budget + 1
         kwargs["max_tokens"] = max_tokens
 
         # Determine which beta headers to use

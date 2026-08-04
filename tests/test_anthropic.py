@@ -337,7 +337,7 @@ def test_fixed_version_tool_chain_with_thinking_display_regression():
         "Use the fixed_version tool. Then tell me the version and make one short joke about it. Think about it first.",
         tools=[fixed_version],
         key=ANTHROPIC_API_KEY,
-        options={"thinking_display": True},
+        options={"thinking": True},
     )
     text = chain_response.text()
     assert FIXED_TEST_VERSION in text
@@ -1458,3 +1458,92 @@ def test_mcp_server_side_tool():
     ]
     assert mcp_results
     assert mcp_results[0].server_executed
+
+
+# --- Simplified thinking options (breaking change) ------------------------
+
+
+def test_thinking_removed_options_rejected():
+    model = llm.get_model("claude-sonnet-4.6")
+    for option in ("thinking_budget", "thinking_adaptive", "thinking_display"):
+        with pytest.raises(Exception):
+            model.Options(**{option: 1})
+
+
+def test_thinking_true_adaptive_on_46():
+    model = llm.get_model("claude-sonnet-4.6")
+    prompt = llm.Prompt("Hi", model, options=model.Options(thinking=True))
+    kwargs = model.build_kwargs(prompt, None)
+    assert kwargs["thinking"] == {"type": "adaptive"}
+
+
+def test_thinking_true_enabled_on_pre_46():
+    model = llm.get_model("claude-opus-4.1")
+    prompt = llm.Prompt("Hi", model, options=model.Options(thinking=True))
+    kwargs = model.build_kwargs(prompt, None)
+    assert kwargs["thinking"] == {"type": "enabled", "budget_tokens": 1024}
+
+
+def test_thinking_false_sends_disabled():
+    model = llm.get_model("claude-sonnet-5")
+    prompt = llm.Prompt("Hi", model, options=model.Options(thinking=False))
+    kwargs = model.build_kwargs(prompt, None)
+    assert kwargs["thinking"] == {"type": "disabled"}
+
+
+def test_thinking_false_fable_raises():
+    model = llm.get_model("claude-fable-5")
+    prompt = llm.Prompt("Hi", model, options=model.Options(thinking=False))
+    with pytest.raises(ValueError, match="cannot be disabled"):
+        model.build_kwargs(prompt, None)
+
+
+def test_thinking_unset_sends_no_param():
+    # 5-family models think by default server-side; we send nothing
+    model = llm.get_model("claude-sonnet-5")
+    prompt = llm.Prompt("Hi", model, options=model.Options())
+    kwargs = model.build_kwargs(prompt, None)
+    assert "thinking" not in kwargs
+
+
+def test_hide_reasoning_sets_omitted_display():
+    # Explicit thinking + hide_reasoning -> omitted display
+    model = llm.get_model("claude-sonnet-4.6")
+    prompt = llm.Prompt(
+        "Hi", model, options=model.Options(thinking=True), hide_reasoning=True
+    )
+    kwargs = model.build_kwargs(prompt, None)
+    assert kwargs["thinking"] == {"type": "adaptive", "display": "omitted"}
+    # Enabled mode also supports omitted
+    old_model = llm.get_model("claude-opus-4.1")
+    old_prompt = llm.Prompt(
+        "Hi", old_model, options=old_model.Options(thinking=True), hide_reasoning=True
+    )
+    old_kwargs = old_model.build_kwargs(old_prompt, None)
+    assert old_kwargs["thinking"] == {
+        "type": "enabled",
+        "budget_tokens": 1024,
+        "display": "omitted",
+    }
+
+
+def test_hide_reasoning_on_default_thinking_model():
+    # 5-family thinks by default: -R must still reach the API as omitted
+    model = llm.get_model("claude-opus-5")
+    prompt = llm.Prompt("Hi", model, options=model.Options(), hide_reasoning=True)
+    kwargs = model.build_kwargs(prompt, None)
+    assert kwargs["thinking"] == {"type": "adaptive", "display": "omitted"}
+    # But thinking=False + hide_reasoning -> just disabled
+    prompt_off = llm.Prompt(
+        "Hi", model, options=model.Options(thinking=False), hide_reasoning=True
+    )
+    kwargs_off = model.build_kwargs(prompt_off, None)
+    assert kwargs_off["thinking"] == {"type": "disabled"}
+
+
+def test_thinking_effort_still_works():
+    model = llm.get_model("claude-sonnet-5")
+    prompt = llm.Prompt("Hi", model, options=model.Options(thinking_effort="max"))
+    kwargs = model.build_kwargs(prompt, None)
+    assert kwargs["thinking"] == {"type": "adaptive"}
+    assert kwargs["output_config"]["effort"] == "max"
