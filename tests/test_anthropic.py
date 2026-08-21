@@ -400,6 +400,38 @@ def test_fast_mode_off_by_default():
     assert "betas" not in kwargs
 
 
+def test_sampling_options_not_sent_by_default():
+    # anthropic>=1.0 removed temperature/top_p/top_k from the SDK method
+    # signatures, and newer models reject them - so nothing is sent unless
+    # the user explicitly sets an option
+    model = llm.get_model("claude-sonnet-4.6")
+    prompt = llm.Prompt("Hi", model, options=model.Options())
+    kwargs = model.build_kwargs(prompt, None)
+    assert "temperature" not in kwargs
+    assert "top_p" not in kwargs
+    assert "top_k" not in kwargs
+    assert "extra_body" not in kwargs
+
+
+def test_sampling_options_sent_via_extra_body():
+    model = llm.get_model("claude-sonnet-4.6")
+    prompt = llm.Prompt(
+        "Hi", model, options=model.Options(temperature=0.2, top_k=5)
+    )
+    kwargs = model.build_kwargs(prompt, None)
+    assert "temperature" not in kwargs
+    assert "top_k" not in kwargs
+    assert kwargs["extra_body"] == {"temperature": 0.2, "top_k": 5}
+
+    # top_p takes precedence over temperature (the options validator
+    # currently requires temperature == 1.0 when top_p is set)
+    prompt = llm.Prompt(
+        "Hi", model, options=model.Options(temperature=1.0, top_p=0.9)
+    )
+    kwargs = model.build_kwargs(prompt, None)
+    assert kwargs["extra_body"] == {"top_p": 0.9}
+
+
 def test_opus_5_registered():
     model = llm.get_model("claude-opus-5")
     assert model.model_id == "anthropic/claude-opus-5"

@@ -17,7 +17,6 @@ from urllib.parse import urlsplit
 from pydantic import Field, field_validator, model_validator
 
 DEFAULT_THINKING_TOKENS = 1024
-DEFAULT_TEMPERATURE = 1.0
 MCP_BETA = "mcp-client-2025-11-20"
 
 
@@ -1158,17 +1157,20 @@ class _Shared:
         if prompt.options.user_id:
             kwargs["metadata"] = {"user_id": prompt.options.user_id}
 
+        # anthropic>=1.0 removed temperature/top_p/top_k from the SDK method
+        # signatures (passing them is a TypeError). The API still accepts them
+        # on models that support sampling parameters, so pass them through
+        # extra_body - and only when explicitly requested, because newer
+        # models (Opus 4.7+, Sonnet 5) reject sampling parameters with a 400.
+        sampling = {}
         if prompt.options.top_p:
-            kwargs["top_p"] = prompt.options.top_p
-        else:
-            kwargs["temperature"] = (
-                prompt.options.temperature
-                if prompt.options.temperature is not None
-                else DEFAULT_TEMPERATURE
-            )
-
+            sampling["top_p"] = prompt.options.top_p
+        elif prompt.options.temperature is not None:
+            sampling["temperature"] = prompt.options.temperature
         if prompt.options.top_k:
-            kwargs["top_k"] = prompt.options.top_k
+            sampling["top_k"] = prompt.options.top_k
+        if sampling:
+            kwargs.setdefault("extra_body", {}).update(sampling)
 
         system = self._extract_system(prompt)
         if system:
@@ -1240,7 +1242,9 @@ class _Shared:
         if max_tokens > 64000 and not self.supports_adaptive_thinking:
             betas.append("output-128k-2025-02-19")
             if "thinking" in kwargs:
-                kwargs["extra_body"] = {"thinking": kwargs.pop("thinking")}
+                kwargs.setdefault("extra_body", {})["thinking"] = kwargs.pop(
+                    "thinking"
+                )
 
         # Check if we should use new structured outputs
         use_structured_outputs = prompt.schema and self.use_structured_outputs
