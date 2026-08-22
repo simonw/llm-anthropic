@@ -1,0 +1,56 @@
+interactions:
+- request:
+    body: '{"model": "claude-haiku-4-5-20251001", "stream": false, "thinking": {"type": "enabled"}}'
+    headers:
+      accept:
+      - application/json
+      anthropic-version:
+      - '2023-06-01'
+      content-type:
+      - application/json
+      host:
+      - api.anthropic.com
+    method: POST
+    uri: https://api.anthropic.com/v1/messages
+  response:
+    body:
+      string: '{"id": "msg_thinking_first", "type": "message", "role": "assistant", "model":
+        "claude-haiku-4-5-20251001", "content": [{"type": "thinking", "thinking": "Weighing
+        which version joke lands best.", "signature": "sig-visible-abc123"}, {"type": "thinking",
+        "thinking": "", "signature": "sig-omitted-def456"}, {"type": "redacted_thinking",
+        "data": "EroBCkYIABgCKkboUrOmNvxg-redacted-one=="}, {"type": "redacted_thinking",
+        "data": "EroBCkYIABgCKkboUrOmNvxg-redacted-two=="}, {"type": "tool_use", "id": "toolu_fixed_1",
+        "name": "fixed_version", "input": {}}], "stop_reason": "tool_use", "stop_sequence":
+        null, "usage": {"input_tokens": 100, "output_tokens": 60}}'
+    headers:
+      Content-Type:
+      - application/json
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"model": "claude-haiku-4-5-20251001", "stream": false, "thinking": {"type": "enabled"}}'
+    headers:
+      accept:
+      - application/json
+      anthropic-version:
+      - '2023-06-01'
+      content-type:
+      - application/json
+      host:
+      - api.anthropic.com
+    method: POST
+    uri: https://api.anthropic.com/v1/messages
+  response:
+    body:
+      string: '{"id": "msg_thinking_second", "type": "message", "role": "assistant", "model":
+        "claude-haiku-4-5-20251001", "content": [{"type": "text", "text": "The version is
+        0.32a0 - so alpha it apologizes before running."}], "stop_reason": "end_turn", "stop_sequence":
+        null, "usage": {"input_tokens": 200, "output_tokens": 25}}'
+    headers:
+      Content-Type:
+      - application/json
+    status:
+      code: 200
+      message: OK
+version: 1

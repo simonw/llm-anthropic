@@ -1547,3 +1547,300 @@ def test_thinking_effort_still_works():
     kwargs = model.build_kwargs(prompt, None)
     assert kwargs["thinking"] == {"type": "adaptive"}
     assert kwargs["output_config"]["effort"] == "max"
+
+
+# --- omitted + redacted thinking preservation -----------------------------
+#
+# https://github.com/simonw/llm-anthropic/issues/81
+#
+# Anthropic requires thinking blocks - including thinking blocks with an
+# empty thinking field (display: "omitted") and redacted_thinking blocks -
+# to be replayed complete, unmodified and in their original order when
+# continuing a tool-use conversation. Redacted blocks cannot be provoked
+# deterministically from the live API, so the cassettes for these tests
+# are hand-authored to the documented wire format.
+
+THINKING_VISIBLE_TEXT = "Weighing which version joke lands best."
+SIG_VISIBLE = "sig-visible-abc123"
+SIG_OMITTED = "sig-omitted-def456"
+REDACTED_DATA_1 = "EroBCkYIABgCKkboUrOmNvxg-redacted-one=="
+REDACTED_DATA_2 = "EroBCkYIABgCKkboUrOmNvxg-redacted-two=="
+TOOL_USE_ID = "toolu_fixed_1"
+
+EXPECTED_THINKING_BLOCKS = [
+    {
+        "type": "thinking",
+        "thinking": THINKING_VISIBLE_TEXT,
+        "signature": SIG_VISIBLE,
+    },
+    {"type": "thinking", "thinking": "", "signature": SIG_OMITTED},
+    {"type": "redacted_thinking", "data": REDACTED_DATA_1},
+    {"type": "redacted_thinking", "data": REDACTED_DATA_2},
+]
+
+
+def _assert_thinking_blocks_preserved(
+    model, chain_response, first_messages, chain_text
+):
+    assert FIXED_TEST_VERSION in chain_text
+    for opaque in (SIG_VISIBLE, SIG_OMITTED, REDACTED_DATA_1, REDACTED_DATA_2):
+        assert opaque not in chain_text
+    assert len(chain_response._responses) == 2
+
+    # The first response's assistant message keeps four distinct
+    # reasoning parts, in the original order, before the tool call.
+    assistant_parts = [
+        part
+        for message in first_messages
+        if message.role == "assistant"
+        for part in message.parts
+    ]
+    reasoning_parts = [p for p in assistant_parts if isinstance(p, ReasoningPart)]
+    assert [p.text for p in reasoning_parts] == [THINKING_VISIBLE_TEXT, "", "", ""]
+    assert not any(p.redacted for p in reasoning_parts)
+    assert reasoning_parts[0].provider_metadata["anthropic"]["signature"] == (
+        SIG_VISIBLE
+    )
+    assert reasoning_parts[1].provider_metadata["anthropic"]["signature"] == (
+        SIG_OMITTED
+    )
+    assert reasoning_parts[2].provider_metadata["anthropic"] == {
+        "type": "redacted_thinking",
+        "data": REDACTED_DATA_1,
+    }
+    assert reasoning_parts[3].provider_metadata["anthropic"] == {
+        "type": "redacted_thinking",
+        "data": REDACTED_DATA_2,
+    }
+    part_types = [type(p).__name__ for p in assistant_parts[:5]]
+    assert part_types == ["ReasoningPart"] * 4 + ["ToolCallPart"]
+
+    # The continuation request replays the complete thinking-block
+    # sequence, byte-for-byte, before the tool_use block.
+    second_response = chain_response._responses[1]
+    second_request_messages = model.build_messages(
+        second_response.prompt, second_response.conversation
+    )
+    assert second_request_messages[1]["role"] == "assistant"
+    assert second_request_messages[1]["content"] == EXPECTED_THINKING_BLOCKS + [
+        {
+            "type": "tool_use",
+            "id": TOOL_USE_ID,
+            "name": "fixed_version",
+            "input": {},
+        }
+    ]
+    assert second_request_messages[2]["content"][0]["type"] == "tool_result"
+
+
+def _thinking_chain_kwargs(streaming):
+    kwargs = {
+        "tools": [fixed_version_tool()],
+        "key": ANTHROPIC_API_KEY,
+        "stream": streaming,
+    }
+    if streaming:
+        kwargs["options"] = {"thinking": True}
+    else:
+        # The SDK requires streaming above 21,333 max_tokens
+        kwargs["options"] = {"thinking": True, "max_tokens": 8000}
+    return kwargs
+
+
+@pytest.mark.vcr
+def test_thinking_blocks_preserved_sync_streaming():
+    model = llm.get_model("claude-haiku-4.5")
+    chain_response = model.chain(
+        "Use the fixed_version tool, then joke about the version.",
+        **_thinking_chain_kwargs(streaming=True),
+    )
+    chain_text = chain_response.text()
+    first_messages = chain_response._responses[0].messages()
+    _assert_thinking_blocks_preserved(
+        model, chain_response, first_messages, chain_text
+    )
+
+
+@pytest.mark.vcr
+def test_thinking_blocks_preserved_sync_non_streaming():
+    model = llm.get_model("claude-haiku-4.5")
+    chain_response = model.chain(
+        "Use the fixed_version tool, then joke about the version.",
+        **_thinking_chain_kwargs(streaming=False),
+    )
+    chain_text = chain_response.text()
+    first_messages = chain_response._responses[0].messages()
+    _assert_thinking_blocks_preserved(
+        model, chain_response, first_messages, chain_text
+    )
+
+
+@pytest.mark.vcr
+@pytest.mark.asyncio
+async def test_thinking_blocks_preserved_async_streaming():
+    model = llm.get_async_model("claude-haiku-4.5")
+    chain_response = model.chain(
+        "Use the fixed_version tool, then joke about the version.",
+        **_thinking_chain_kwargs(streaming=True),
+    )
+    chain_text = await chain_response.text()
+    first_messages = await chain_response._responses[0].messages()
+    _assert_thinking_blocks_preserved(
+        model, chain_response, first_messages, chain_text
+    )
+
+
+@pytest.mark.vcr
+@pytest.mark.asyncio
+async def test_thinking_blocks_preserved_async_non_streaming():
+    model = llm.get_async_model("claude-haiku-4.5")
+    chain_response = model.chain(
+        "Use the fixed_version tool, then joke about the version.",
+        **_thinking_chain_kwargs(streaming=False),
+    )
+    chain_text = await chain_response.text()
+    first_messages = await chain_response._responses[0].messages()
+    _assert_thinking_blocks_preserved(
+        model, chain_response, first_messages, chain_text
+    )
+
+
+@pytest.mark.vcr
+def test_thinking_blocks_survive_db_round_trip(tmp_path):
+    """A logged conversation must retain omitted and redacted thinking
+    metadata so the replayed request is identical after loading."""
+    import sqlite_utils
+    from llm.cli import load_conversation
+    from llm.migrations import migrate
+
+    model = llm.get_model("claude-haiku-4.5")
+    chain_response = model.chain(
+        "Use the fixed_version tool, then joke about the version.",
+        **_thinking_chain_kwargs(streaming=True),
+    )
+    chain_response.text()
+
+    db = sqlite_utils.Database(str(tmp_path / "logs.db"))
+    migrate(db)
+    chain_response.log_to_db(db)
+
+    loaded = load_conversation(None, database=str(tmp_path / "logs.db"))
+    follow_up = loaded.prompt("one more joke please")
+    anthropic_messages = model.build_messages(follow_up.prompt, loaded)
+    assert anthropic_messages[1]["role"] == "assistant"
+    assert anthropic_messages[1]["content"] == EXPECTED_THINKING_BLOCKS + [
+        {
+            "type": "tool_use",
+            "id": TOOL_USE_ID,
+            "name": "fixed_version",
+            "input": {},
+        }
+    ]
+    tool_result_blocks = [
+        block
+        for message in anthropic_messages
+        for block in message["content"]
+        if block["type"] == "tool_result"
+    ]
+    assert tool_result_blocks == [
+        {
+            "type": "tool_result",
+            "tool_use_id": TOOL_USE_ID,
+            "content": FIXED_TEST_VERSION,
+        }
+    ]
+
+
+def test_build_messages_omitted_thinking_round_trips_signature():
+    """An omitted thinking block (empty text + signature) must replay as a
+    thinking block with empty thinking and the exact signature."""
+    from llm import assistant, user
+
+    msgs = _build_messages_for(
+        {
+            "messages": [
+                user("q"),
+                assistant(
+                    ReasoningPart(
+                        text="",
+                        provider_metadata={"anthropic": {"signature": "sig-omitted"}},
+                    ),
+                    TextPart(text="answer"),
+                ),
+            ]
+        }
+    )
+    assert msgs[1]["content"][0] == {
+        "type": "thinking",
+        "thinking": "",
+        "signature": "sig-omitted",
+    }
+
+
+def test_build_messages_redacted_thinking_round_trips_data():
+    """Provider-authentic redacted metadata reconstructs the exact
+    redacted_thinking block; adjacent blocks stay distinct and ordered."""
+    from llm import assistant, user
+
+    msgs = _build_messages_for(
+        {
+            "messages": [
+                user("q"),
+                assistant(
+                    ReasoningPart(
+                        text="visible",
+                        provider_metadata={"anthropic": {"signature": "sig-1"}},
+                    ),
+                    ReasoningPart(
+                        text="",
+                        provider_metadata={
+                            "anthropic": {
+                                "type": "redacted_thinking",
+                                "data": "opaque-1==",
+                            }
+                        },
+                    ),
+                    ReasoningPart(
+                        text="",
+                        provider_metadata={
+                            "anthropic": {
+                                "type": "redacted_thinking",
+                                "data": "opaque-2==",
+                            }
+                        },
+                    ),
+                    ToolCallPart(name="clock", arguments={}, tool_call_id="c1"),
+                ),
+            ]
+        }
+    )
+    assert msgs[1]["content"] == [
+        {"type": "thinking", "thinking": "visible", "signature": "sig-1"},
+        {"type": "redacted_thinking", "data": "opaque-1=="},
+        {"type": "redacted_thinking", "data": "opaque-2=="},
+        {"type": "tool_use", "id": "c1", "name": "clock", "input": {}},
+    ]
+
+
+def test_build_messages_ordinary_reasoning_is_not_invented_as_redacted():
+    """ReasoningParts without Anthropic redacted metadata - including
+    generic redacted=True markers from other providers - must not be
+    turned into redacted_thinking blocks."""
+    from llm import assistant, user
+
+    msgs = _build_messages_for(
+        {
+            "messages": [
+                user("q"),
+                assistant(
+                    ReasoningPart(
+                        text="thinking...",
+                        provider_metadata={"anthropic": {"signature": "sig-abc"}},
+                    ),
+                    ReasoningPart(text="", redacted=True),
+                    TextPart(text="answer"),
+                ),
+            ]
+        }
+    )
+    assert all(block["type"] != "redacted_thinking" for block in msgs[1]["content"])

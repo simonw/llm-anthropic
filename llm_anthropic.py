@@ -961,6 +961,15 @@ class _Shared:
             block: Dict[str, Any] = {"type": "text", "text": part.text}
             return block
         if isinstance(part, ReasoningPart):
+            if (
+                isinstance(anthropic_pm, dict)
+                and anthropic_pm.get("type") == "redacted_thinking"
+                and anthropic_pm.get("data") is not None
+            ):
+                # Provider-authentic redacted thinking replays as the
+                # original redacted_thinking block with its opaque data
+                # unchanged - the API rejects modified thinking blocks.
+                return {"type": "redacted_thinking", "data": anthropic_pm["data"]}
             block = {"type": "thinking", "thinking": part.text}
             # Anthropic signed-thinking requires the signature echoed back.
             sig = (
@@ -1375,6 +1384,20 @@ class ClaudeMessages(_Shared, llm.KeyModel):
                                     else None
                                 ),
                             )
+                        elif block_type == "redacted_thinking":
+                            # Delivered complete on content_block_start; the
+                            # opaque data must be preserved for replay.
+                            yield StreamEvent(
+                                type="reasoning",
+                                chunk="",
+                                part_index=chunk.index,
+                                provider_metadata={
+                                    "anthropic": {
+                                        "type": "redacted_thinking",
+                                        "data": block.data,
+                                    }
+                                },
+                            )
                         elif block_type and block_type.endswith("_tool_result"):
                             # Content is available inline on content_block_start
                             yield self._server_tool_result_event(block_type, block)
@@ -1383,12 +1406,20 @@ class ClaudeMessages(_Shared, llm.KeyModel):
                         delta = chunk.delta
                         delta_type = getattr(delta, "type", None)
 
+                        # part_index pins reasoning events to their Anthropic
+                        # content block so adjacent thinking blocks stay
+                        # distinct Parts instead of merging.
                         if delta_type == "thinking_delta":
-                            yield StreamEvent(type="reasoning", chunk=delta.thinking)
+                            yield StreamEvent(
+                                type="reasoning",
+                                chunk=delta.thinking,
+                                part_index=chunk.index,
+                            )
                         elif delta_type == "signature_delta":
                             yield StreamEvent(
                                 type="reasoning",
                                 chunk="",
+                                part_index=chunk.index,
                                 provider_metadata={
                                     "anthropic": {"signature": delta.signature}
                                 },
@@ -1422,18 +1453,33 @@ class ClaudeMessages(_Shared, llm.KeyModel):
                     yield StreamEvent(type="text", chunk=" ")
         else:
             completion = messages_client.create(**kwargs)
-            for item in completion.content:
+            for index, item in enumerate(completion.content):
                 item_type = getattr(item, "type", None)
+                # part_index pins reasoning events to their content block so
+                # adjacent thinking blocks stay distinct Parts.
                 if item_type == "thinking":
                     signature = getattr(item, "signature", None)
                     yield StreamEvent(
                         type="reasoning",
                         chunk=item.thinking,
+                        part_index=index,
                         provider_metadata=(
                             {"anthropic": {"signature": signature}}
                             if signature
                             else None
                         ),
+                    )
+                elif item_type == "redacted_thinking":
+                    yield StreamEvent(
+                        type="reasoning",
+                        chunk="",
+                        part_index=index,
+                        provider_metadata={
+                            "anthropic": {
+                                "type": "redacted_thinking",
+                                "data": item.data,
+                            }
+                        },
                     )
                 elif item_type == "text":
                     text = (prefill_text + item.text) if prefill_text else item.text
@@ -1525,6 +1571,20 @@ class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
                                     else None
                                 ),
                             )
+                        elif block_type == "redacted_thinking":
+                            # Delivered complete on content_block_start; the
+                            # opaque data must be preserved for replay.
+                            yield StreamEvent(
+                                type="reasoning",
+                                chunk="",
+                                part_index=chunk.index,
+                                provider_metadata={
+                                    "anthropic": {
+                                        "type": "redacted_thinking",
+                                        "data": block.data,
+                                    }
+                                },
+                            )
                         elif block_type and block_type.endswith("_tool_result"):
                             yield self._server_tool_result_event(block_type, block)
 
@@ -1532,12 +1592,20 @@ class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
                         delta = chunk.delta
                         delta_type = getattr(delta, "type", None)
 
+                        # part_index pins reasoning events to their Anthropic
+                        # content block so adjacent thinking blocks stay
+                        # distinct Parts instead of merging.
                         if delta_type == "thinking_delta":
-                            yield StreamEvent(type="reasoning", chunk=delta.thinking)
+                            yield StreamEvent(
+                                type="reasoning",
+                                chunk=delta.thinking,
+                                part_index=chunk.index,
+                            )
                         elif delta_type == "signature_delta":
                             yield StreamEvent(
                                 type="reasoning",
                                 chunk="",
+                                part_index=chunk.index,
                                 provider_metadata={
                                     "anthropic": {"signature": delta.signature}
                                 },
@@ -1567,18 +1635,33 @@ class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
             self.add_tool_usage(response, response.response_json)
         else:
             completion = await messages_client.create(**kwargs)
-            for item in completion.content:
+            for index, item in enumerate(completion.content):
                 item_type = getattr(item, "type", None)
+                # part_index pins reasoning events to their content block so
+                # adjacent thinking blocks stay distinct Parts.
                 if item_type == "thinking":
                     signature = getattr(item, "signature", None)
                     yield StreamEvent(
                         type="reasoning",
                         chunk=item.thinking,
+                        part_index=index,
                         provider_metadata=(
                             {"anthropic": {"signature": signature}}
                             if signature
                             else None
                         ),
+                    )
+                elif item_type == "redacted_thinking":
+                    yield StreamEvent(
+                        type="reasoning",
+                        chunk="",
+                        part_index=index,
+                        provider_metadata={
+                            "anthropic": {
+                                "type": "redacted_thinking",
+                                "data": item.data,
+                            }
+                        },
                     )
                 elif item_type == "text":
                     text = (prefill_text + item.text) if prefill_text else item.text
