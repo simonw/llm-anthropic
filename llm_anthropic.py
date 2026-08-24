@@ -215,6 +215,7 @@ def register_models(register):
             supports_thinking=True,
             supports_web_search=True,
             supports_code_execution=True,
+            use_structured_outputs=True,
             default_max_tokens=64000,
         ),
         AsyncClaudeMessages(
@@ -223,6 +224,7 @@ def register_models(register):
             supports_thinking=True,
             supports_web_search=True,
             supports_code_execution=True,
+            use_structured_outputs=True,
             default_max_tokens=64000,
         ),
         aliases=("claude-haiku-4.5",),

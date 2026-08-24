@@ -496,6 +496,22 @@ def test_fast_mode_off_by_default():
     assert "betas" not in kwargs
 
 
+def test_haiku_4_5_uses_structured_outputs():
+    # https://github.com/simonw/llm-anthropic/issues/61
+    # The tools fallback for schemas breaks in multi-turn conversations,
+    # so models that support structured outputs server-side must use them
+    model = llm.get_model("claude-haiku-4.5")
+    assert model.use_structured_outputs
+    async_model = llm.get_async_model("claude-haiku-4.5")
+    assert async_model.use_structured_outputs
+    prompt = llm.Prompt(
+        "Hi", model, options=model.Options(), schema={"type": "object"}
+    )
+    kwargs = model.build_kwargs(prompt, None)
+    assert kwargs["output_config"]["format"]["type"] == "json_schema"
+    assert "tool_choice" not in kwargs
+
+
 def test_opus_5_registered():
     model = llm.get_model("claude-opus-5")
     assert model.model_id == "anthropic/claude-opus-5"
