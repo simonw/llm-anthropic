@@ -911,6 +911,20 @@ class _Shared:
             tool_name=block_type.removesuffix("_tool_result"),
         )
 
+    def _block_part_index(self, chunk) -> Optional[int]:
+        """Explicit StreamEvent part_index for an Anthropic content block.
+
+        Each Anthropic block index gets its own part index so that
+        consecutive thinking / redacted_thinking blocks assemble into
+        distinct ReasoningParts instead of merging - merging would
+        concatenate their text and keep only the last signature, and
+        Anthropic rejects continuations whose thinking blocks don't
+        match what the model generated. Offset by 1 so the prefill
+        text event can use part_index 0 without colliding.
+        """
+        index = getattr(chunk, "index", None)
+        return None if index is None else index + 1
+
     def _apply_container(self, message_dict, container):
         """Store the code execution container on the response JSON.
 
@@ -963,6 +977,14 @@ class _Shared:
             block: Dict[str, Any] = {"type": "text", "text": part.text}
             return block
         if isinstance(part, ReasoningPart):
+            if (
+                isinstance(anthropic_pm, dict)
+                and anthropic_pm.get("type") == "redacted_thinking"
+                and anthropic_pm.get("data")
+            ):
+                # Safety-redacted reasoning: the opaque data must be
+                # replayed byte-for-byte as a redacted_thinking block.
+                return {"type": "redacted_thinking", "data": anthropic_pm["data"]}
             block = {"type": "thinking", "thinking": part.text}
             # Anthropic signed-thinking requires the signature echoed back.
             sig = (
@@ -1351,12 +1373,15 @@ class ClaudeMessages(_Shared, llm.KeyModel):
             container = None
 
             if prefill_text:
-                yield StreamEvent(type="text", chunk=prefill_text)
+                # part_index 0 is reserved for the prefill so it can
+                # never collide with a content block's explicit index.
+                yield StreamEvent(type="text", chunk=prefill_text, part_index=0)
 
             for chunk in stream_obj:
                 if chunk.type == "content_block_start":
                     block = chunk.content_block
                     block_type = getattr(block, "type", None)
+                    block_part_index = self._block_part_index(chunk)
                     current_block_id = getattr(block, "id", None)
                     current_block_name = getattr(block, "name", None)
                     is_server_tool = block_type in (
@@ -1364,7 +1389,23 @@ class ClaudeMessages(_Shared, llm.KeyModel):
                         "mcp_tool_use",
                     ) or (block_type or "").endswith("_tool_result")
 
-                    if block_type in (
+                    if block_type == "redacted_thinking":
+                        # The opaque block arrives complete on
+                        # content_block_start; preserve it as a
+                        # metadata-only reasoning part so it replays
+                        # unchanged in continuation requests.
+                        yield StreamEvent(
+                            type="reasoning",
+                            chunk="",
+                            part_index=block_part_index,
+                            provider_metadata={
+                                "anthropic": {
+                                    "type": "redacted_thinking",
+                                    "data": getattr(block, "data", ""),
+                                }
+                            },
+                        )
+                    elif block_type in (
                         "tool_use",
                         "server_tool_use",
                         "mcp_tool_use",
@@ -1372,6 +1413,7 @@ class ClaudeMessages(_Shared, llm.KeyModel):
                         yield StreamEvent(
                             type="tool_call_name",
                             chunk=current_block_name or "",
+                            part_index=block_part_index,
                             tool_call_id=current_block_id,
                             server_executed=(block_type != "tool_use"),
                             provider_metadata=(
@@ -1388,28 +1430,41 @@ class ClaudeMessages(_Shared, llm.KeyModel):
                         )
                     elif block_type and block_type.endswith("_tool_result"):
                         # Content is available inline on content_block_start
-                        yield self._server_tool_result_event(block_type, block)
+                        event = self._server_tool_result_event(block_type, block)
+                        event.part_index = block_part_index
+                        yield event
 
                 elif chunk.type == "content_block_delta":
                     delta = chunk.delta
                     delta_type = getattr(delta, "type", None)
+                    block_part_index = self._block_part_index(chunk)
 
                     if delta_type == "thinking_delta":
-                        yield StreamEvent(type="reasoning", chunk=delta.thinking)
+                        yield StreamEvent(
+                            type="reasoning",
+                            chunk=delta.thinking,
+                            part_index=block_part_index,
+                        )
                     elif delta_type == "signature_delta":
                         yield StreamEvent(
                             type="reasoning",
                             chunk="",
+                            part_index=block_part_index,
                             provider_metadata={
                                 "anthropic": {"signature": delta.signature}
                             },
                         )
                     elif delta_type == "text_delta":
-                        yield StreamEvent(type="text", chunk=delta.text)
+                        yield StreamEvent(
+                            type="text",
+                            chunk=delta.text,
+                            part_index=block_part_index,
+                        )
                     elif delta_type == "input_json_delta":
                         yield StreamEvent(
                             type="tool_call_args",
                             chunk=delta.partial_json,
+                            part_index=block_part_index,
                             tool_call_id=current_block_id,
                             server_executed=is_server_tool,
                         )
@@ -1453,12 +1508,15 @@ class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
             container = None
 
             if prefill_text:
-                yield StreamEvent(type="text", chunk=prefill_text)
+                # part_index 0 is reserved for the prefill so it can
+                # never collide with a content block's explicit index.
+                yield StreamEvent(type="text", chunk=prefill_text, part_index=0)
 
             async for chunk in stream_obj:
                 if chunk.type == "content_block_start":
                     block = chunk.content_block
                     block_type = getattr(block, "type", None)
+                    block_part_index = self._block_part_index(chunk)
                     current_block_id = getattr(block, "id", None)
                     current_block_name = getattr(block, "name", None)
                     is_server_tool = block_type in (
@@ -1466,7 +1524,23 @@ class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
                         "mcp_tool_use",
                     ) or (block_type or "").endswith("_tool_result")
 
-                    if block_type in (
+                    if block_type == "redacted_thinking":
+                        # The opaque block arrives complete on
+                        # content_block_start; preserve it as a
+                        # metadata-only reasoning part so it replays
+                        # unchanged in continuation requests.
+                        yield StreamEvent(
+                            type="reasoning",
+                            chunk="",
+                            part_index=block_part_index,
+                            provider_metadata={
+                                "anthropic": {
+                                    "type": "redacted_thinking",
+                                    "data": getattr(block, "data", ""),
+                                }
+                            },
+                        )
+                    elif block_type in (
                         "tool_use",
                         "server_tool_use",
                         "mcp_tool_use",
@@ -1474,6 +1548,7 @@ class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
                         yield StreamEvent(
                             type="tool_call_name",
                             chunk=current_block_name or "",
+                            part_index=block_part_index,
                             tool_call_id=current_block_id,
                             server_executed=(block_type != "tool_use"),
                             provider_metadata=(
@@ -1489,28 +1564,41 @@ class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
                             ),
                         )
                     elif block_type and block_type.endswith("_tool_result"):
-                        yield self._server_tool_result_event(block_type, block)
+                        event = self._server_tool_result_event(block_type, block)
+                        event.part_index = block_part_index
+                        yield event
 
                 elif chunk.type == "content_block_delta":
                     delta = chunk.delta
                     delta_type = getattr(delta, "type", None)
+                    block_part_index = self._block_part_index(chunk)
 
                     if delta_type == "thinking_delta":
-                        yield StreamEvent(type="reasoning", chunk=delta.thinking)
+                        yield StreamEvent(
+                            type="reasoning",
+                            chunk=delta.thinking,
+                            part_index=block_part_index,
+                        )
                     elif delta_type == "signature_delta":
                         yield StreamEvent(
                             type="reasoning",
                             chunk="",
+                            part_index=block_part_index,
                             provider_metadata={
                                 "anthropic": {"signature": delta.signature}
                             },
                         )
                     elif delta_type == "text_delta":
-                        yield StreamEvent(type="text", chunk=delta.text)
+                        yield StreamEvent(
+                            type="text",
+                            chunk=delta.text,
+                            part_index=block_part_index,
+                        )
                     elif delta_type == "input_json_delta":
                         yield StreamEvent(
                             type="tool_call_args",
                             chunk=delta.partial_json,
+                            part_index=block_part_index,
                             tool_call_id=current_block_id,
                             server_executed=is_server_tool,
                         )
