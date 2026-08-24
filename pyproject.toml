@@ -1,6 +1,6 @@
 [project]
 name = "llm-anthropic"
-version = "0.25"
+version = "0.26"
 description = "LLM access to models by Anthropic, including the Claude series"
 readme = "README.md"
 authors = [{name = "Simon Willison"}]
@@ -8,8 +8,8 @@ license = "Apache-2.0"
 requires-python = ">=3.10"
 classifiers = []
 dependencies = [
-    "llm>=0.32a1",
-    "anthropic>=0.96.0",
+    "llm>=0.32",
+    "anthropic>=1,<2",
 ]
 
 [project.urls]
@@ -22,7 +22,15 @@ CI = "https://github.com/simonw/llm-anthropic/actions"
 anthropic = "llm_anthropic"
 
 [dependency-groups]
-dev = ["pytest", "pytest-recording", "pytest-asyncio", "cogapp", "inline-snapshot[black]"]
+dev = [
+    "pytest",
+    "pytest-recording",
+    # vcrpy 8.3+ can record/replay httpx2, used by anthropic>=1
+    "vcrpy>=8.3",
+    "pytest-asyncio",
+    "cogapp",
+    "inline-snapshot[black]",
+]
 
 [tool.uv]
 package = true

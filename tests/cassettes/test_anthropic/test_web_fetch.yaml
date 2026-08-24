@@ -1,0 +1,230 @@
+interactions:
+- request:
+    body: '{"max_tokens":128000,"messages":[{"role":"user","content":[{"type":"text","text":"Fetch
+      https://www.example.com/ and quote the first sentence of the page"}]}],"model":"claude-sonnet-4-6","temperature":1.0,"tools":[{"type":"web_fetch_20260318","name":"web_fetch","max_uses":1}],"stream":true}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      anthropic-version:
+      - '2023-06-01'
+      connection:
+      - keep-alive
+      content-length:
+      - '291'
+      content-type:
+      - application/json
+      host:
+      - api.anthropic.com
+      user-agent:
+      - Anthropic/Python 0.96.0
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-helper-method:
+      - stream
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 0.96.0
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.14.3
+      x-stainless-stream-helper:
+      - messages
+      x-stainless-timeout:
+      - NOT_GIVEN
+    method: POST
+    uri: https://api.anthropic.com/v1/messages
+  response:
+    body:
+      string: 'event: message_start
+
+        data: {"type":"message_start","message":{"model":"claude-sonnet-4-6","id":"msg_011CdiGkjBYvDVmDDwhLnuib","type":"message","role":"assistant","content":[],"stop_reason":null,"stop_sequence":null,"stop_details":null,"usage":{"input_tokens":3830,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":0},"output_tokens":50,"service_tier":"standard","inference_geo":"global"}}        }
+
+
+        event: content_block_start
+
+        data: {"type":"content_block_start","index":0,"content_block":{"type":"server_tool_use","id":"srvtoolu_01T5qVo7FADuAiWNiMZrkdgi","name":"code_execution","input":{}}               }
+
+
+        event: ping
+
+        data: {"type": "ping"}
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":""}  }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\"code\":
+        \"\\nimport json\\nresult = await web_fetch({\\\"url\\\": \\\"https://www."}      }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"example.com/\\\"})\\nentry
+        = json.loads(result)[0]\\nif entry.get(\\\"error_code\\\"):\\n    print(\\\"Error:\\\",
+        entry[\\\"error_code\\\"])\\nelse:\\n    print"}        }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"(entry[\\\"content\\\"][:500])\\n"}   }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"\"}"}  }
+
+
+        event: content_block_stop
+
+        data: {"type":"content_block_stop","index":0       }
+
+
+        event: content_block_start
+
+        data: {"type":"content_block_start","index":1,"content_block":{"type":"server_tool_use","id":"srvtoolu_01RbP8H48u9cmEGMLd3NLRjA","name":"web_fetch","input":{"url":"https://www.example.com/"},"caller":{"type":"code_execution_20260120","tool_id":"srvtoolu_01T5qVo7FADuAiWNiMZrkdgi"}}
+        }
+
+
+        event: content_block_stop
+
+        data: {"type":"content_block_stop","index":1            }
+
+
+        event: content_block_start
+
+        data: {"type":"content_block_start","index":2,"content_block":{"type":"web_fetch_tool_result","tool_use_id":"srvtoolu_01RbP8H48u9cmEGMLd3NLRjA","content":{"type":"web_fetch_result","url":"https://www.example.com/","retrieved_at":"2026-08-04T12:00:36.524000+00:00","content":{"type":"document","source":{"type":"text","media_type":"text/plain","data":"---\nmeta-viewport:
+        width=device-width, initial-scale=1\ntitle: Example Domain\n---\n\n# Example
+        Domain\n\nThis domain is for use in documentation examples without needing
+        permission. Avoid use in operations.\n\n[Learn more](https://iana.org/domains/example)"},"title":"Example
+        Domain"}},"caller":{"type":"code_execution_20260120","tool_id":"srvtoolu_01T5qVo7FADuAiWNiMZrkdgi"}}  }
+
+
+        event: content_block_stop
+
+        data: {"type":"content_block_stop","index":2      }
+
+
+        event: content_block_start
+
+        data: {"type":"content_block_start","index":3,"content_block":{"type":"code_execution_tool_result","tool_use_id":"srvtoolu_01T5qVo7FADuAiWNiMZrkdgi","content":{"type":"code_execution_result","stdout":"---\nmeta-viewport:
+        width=device-width, initial-scale=1\ntitle: Example Domain\n---\n\n# Example
+        Domain\n\nThis domain is for use in documentation examples without needing
+        permission. Avoid use in operations.\n\n[Learn more](https://iana.org/domains/example)\n","stderr":"","return_code":0,"content":[],"abort_reason":null}}              }
+
+
+        event: content_block_stop
+
+        data: {"type":"content_block_stop","index":3  }
+
+
+        event: content_block_start
+
+        data: {"type":"content_block_start","index":4,"content_block":{"type":"text","text":""}            }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":4,"delta":{"type":"text_delta","text":"The
+        first sentence of ["} }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":4,"delta":{"type":"text_delta","text":"example.com](https://www.example.com/)
+        is:\n\n> \"This domain is for use in documentation examples without needing
+        permission.\""}         }
+
+
+        event: content_block_stop
+
+        data: {"type":"content_block_stop","index":4         }
+
+
+        event: message_delta
+
+        data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null,"stop_details":null,"container":{"id":"container_01Eh28C5Ljas41Jm1u1YpFw7","expires_at":"2026-08-04T20:37:41.233410Z"}},"usage":{"input_tokens":7867,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":163,"server_tool_use":{"web_search_requests":0,"web_fetch_requests":1}}  }
+
+
+        event: message_stop
+
+        data: {"type":"message_stop"              }
+
+
+        '
+    headers:
+      CF-RAY:
+      - a2600445e85bed3a-SJC
+      Cache-Control:
+      - no-cache
+      Connection:
+      - keep-alive
+      Content-Security-Policy:
+      - default-src 'none'; frame-ancestors 'none'
+      Content-Type:
+      - text/event-stream; charset=utf-8
+      Date:
+      - Tue, 04 Aug 2026 19:37:34 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      X-Robots-Tag:
+      - none
+      anthropic-organization-id:
+      - b320df16-c763-4455-b901-3f7d54e9a012
+      anthropic-ratelimit-input-tokens-limit:
+      - '10000000'
+      anthropic-ratelimit-input-tokens-remaining:
+      - '9998000'
+      anthropic-ratelimit-input-tokens-reset:
+      - '2026-08-04T19:37:27Z'
+      anthropic-ratelimit-output-tokens-limit:
+      - '2000000'
+      anthropic-ratelimit-output-tokens-remaining:
+      - '2000000'
+      anthropic-ratelimit-output-tokens-reset:
+      - '2026-08-04T19:37:27Z'
+      anthropic-ratelimit-requests-limit:
+      - '20000'
+      anthropic-ratelimit-requests-remaining:
+      - '19999'
+      anthropic-ratelimit-requests-reset:
+      - '2026-08-04T19:37:27Z'
+      anthropic-ratelimit-tokens-limit:
+      - '12000000'
+      anthropic-ratelimit-tokens-remaining:
+      - '11998000'
+      anthropic-ratelimit-tokens-reset:
+      - '2026-08-04T19:37:27Z'
+      cf-cache-status:
+      - DYNAMIC
+      content-length:
+      - '4713'
+      request-id:
+      - req_011CdiGkhAkqa6vVuaXhcS2W
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      traceresponse:
+      - 00-b5daf0e0e807969c18674ca9a41060f1-4bc3385c2bf6af69-01
+      vary:
+      - Accept-Encoding
+    status:
+      code: 200
+      message: OK
+version: 1

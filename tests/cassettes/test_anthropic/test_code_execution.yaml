@@ -1,0 +1,206 @@
+interactions:
+- request:
+    body: '{"max_tokens":128000,"messages":[{"role":"user","content":[{"type":"text","text":"Use
+      code execution to compute 123456789 * 987654321 exactly. Reply with just the
+      number."}]}],"model":"claude-sonnet-4-6","temperature":1.0,"tools":[{"type":"code_execution_20260521","name":"code_execution"}],"stream":true}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      anthropic-version:
+      - '2023-06-01'
+      connection:
+      - keep-alive
+      content-length:
+      - '305'
+      content-type:
+      - application/json
+      host:
+      - api.anthropic.com
+      user-agent:
+      - Anthropic/Python 0.96.0
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-helper-method:
+      - stream
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 0.96.0
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.14.3
+      x-stainless-stream-helper:
+      - messages
+      x-stainless-timeout:
+      - NOT_GIVEN
+    method: POST
+    uri: https://api.anthropic.com/v1/messages
+  response:
+    body:
+      string: 'event: message_start
+
+        data: {"type":"message_start","message":{"model":"claude-sonnet-4-6","id":"msg_011CdiP31ZC91pv56oRVa6T6","type":"message","role":"assistant","content":[],"stop_reason":null,"stop_sequence":null,"stop_details":null,"usage":{"input_tokens":2268,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":0},"output_tokens":42,"service_tier":"standard","inference_geo":"global"}}         }
+
+
+        event: content_block_start
+
+        data: {"type":"content_block_start","index":0,"content_block":{"type":"server_tool_use","id":"srvtoolu_01LiDpB7y66hzYuPupwvZQ7d","name":"bash_code_execution","input":{}}
+        }
+
+
+        event: ping
+
+        data: {"type": "ping"}
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":""}              }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\"command"}             }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"\":
+        \"echo "}   }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"$((12345"}           }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"6789
+        * 98765"}             }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"4321))\"}"}   }
+
+
+        event: content_block_stop
+
+        data: {"type":"content_block_stop","index":0             }
+
+
+        event: content_block_start
+
+        data: {"type":"content_block_start","index":1,"content_block":{"type":"bash_code_execution_tool_result","tool_use_id":"srvtoolu_01LiDpB7y66hzYuPupwvZQ7d","content":{"type":"bash_code_execution_result","stdout":"121932631112635269\n","stderr":"","return_code":0,"content":[]}}      }
+
+
+        event: content_block_stop
+
+        data: {"type":"content_block_stop","index":1    }
+
+
+        event: content_block_start
+
+        data: {"type":"content_block_start","index":2,"content_block":{"type":"text","text":""}     }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":2,"delta":{"type":"text_delta","text":"121"}       }
+
+
+        event: content_block_delta
+
+        data: {"type":"content_block_delta","index":2,"delta":{"type":"text_delta","text":"932631112635269"}
+        }
+
+
+        event: content_block_stop
+
+        data: {"type":"content_block_stop","index":2  }
+
+
+        event: message_delta
+
+        data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null,"stop_details":null,"container":{"id":"container_01VV73UUWfmQL4NyTCXwE6qe","expires_at":"2026-08-04T21:59:53.096637Z"}},"usage":{"input_tokens":4627,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":77,"server_tool_use":{"web_search_requests":0,"web_fetch_requests":0}}           }
+
+
+        event: message_stop
+
+        data: {"type":"message_stop"     }
+
+
+        '
+    headers:
+      CF-RAY:
+      - a2607ce9fe5d1354-SJC
+      Cache-Control:
+      - no-cache
+      Connection:
+      - keep-alive
+      Content-Security-Policy:
+      - default-src 'none'; frame-ancestors 'none'
+      Content-Type:
+      - text/event-stream; charset=utf-8
+      Date:
+      - Tue, 04 Aug 2026 20:59:50 GMT
+      Server:
+      - cloudflare
+      Transfer-Encoding:
+      - chunked
+      X-Robots-Tag:
+      - none
+      anthropic-organization-id:
+      - b320df16-c763-4455-b901-3f7d54e9a012
+      anthropic-ratelimit-input-tokens-limit:
+      - '10000000'
+      anthropic-ratelimit-input-tokens-remaining:
+      - '9999000'
+      anthropic-ratelimit-input-tokens-reset:
+      - '2026-08-04T20:59:48Z'
+      anthropic-ratelimit-output-tokens-limit:
+      - '2000000'
+      anthropic-ratelimit-output-tokens-remaining:
+      - '2000000'
+      anthropic-ratelimit-output-tokens-reset:
+      - '2026-08-04T20:59:48Z'
+      anthropic-ratelimit-requests-limit:
+      - '20000'
+      anthropic-ratelimit-requests-remaining:
+      - '19999'
+      anthropic-ratelimit-requests-reset:
+      - '2026-08-04T20:59:48Z'
+      anthropic-ratelimit-tokens-limit:
+      - '12000000'
+      anthropic-ratelimit-tokens-remaining:
+      - '11999000'
+      anthropic-ratelimit-tokens-reset:
+      - '2026-08-04T20:59:48Z'
+      cf-cache-status:
+      - DYNAMIC
+      content-length:
+      - '3001'
+      request-id:
+      - req_011CdiP2wz8UWz3QLigpGGbA
+      strict-transport-security:
+      - max-age=31536000; includeSubDomains; preload
+      traceresponse:
+      - 00-52860298ca75373bf529b5110df0d46e-8f4b7cd1268e2c9a-01
+      vary:
+      - Accept-Encoding
+    status:
+      code: 200
+      message: OK
+version: 1
