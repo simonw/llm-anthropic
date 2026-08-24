@@ -956,6 +956,70 @@ def test_extract_system_prefers_prompt_system_over_messages():
     assert model._extract_system(p) == "legacy sys"
 
 
+def test_mid_conversation_system_message_sent_inline():
+    # https://github.com/simonw/llm-anthropic/issues/73
+    from llm import system, user, assistant
+
+    model = llm.get_model("claude-opus-5")
+    p = llm.Prompt(
+        None,
+        model=model,
+        options=model.Options(),
+        messages=[
+            system("be helpful"),
+            user("hi"),
+            assistant("hello!"),
+            system("reply only in French"),
+            user("bye"),
+        ],
+    )
+    kwargs = model.build_kwargs(p, None)
+    # First system message is still hoisted to the top-level field
+    assert kwargs["system"] == "be helpful"
+    # The mid-conversation one is inline, bubbled after the user turn to
+    # satisfy the API's placement rules
+    assert [(m["role"], m["content"][0]["text"]) for m in kwargs["messages"]] == [
+        ("user", "hi"),
+        ("assistant", "hello!"),
+        ("user", "bye"),
+        ("system", "reply only in French"),
+    ]
+
+
+def test_mid_conversation_system_message_rejected_on_older_models():
+    from llm import system, user, assistant
+
+    model = llm.get_model("claude-sonnet-4.5")
+    p = llm.Prompt(
+        None,
+        model=model,
+        options=model.Options(),
+        messages=[
+            user("hi"),
+            assistant("hello!"),
+            system("reply only in French"),
+            user("bye"),
+        ],
+    )
+    with pytest.raises(ValueError, match="mid-conversation system messages"):
+        model.build_kwargs(p, None)
+
+
+def test_leading_system_message_not_duplicated_inline():
+    from llm import system, user
+
+    model = llm.get_model("claude-opus-5")
+    p = llm.Prompt(
+        None,
+        model=model,
+        options=model.Options(),
+        messages=[system("be helpful"), user("hi")],
+    )
+    kwargs = model.build_kwargs(p, None)
+    assert kwargs["system"] == "be helpful"
+    assert [m["role"] for m in kwargs["messages"]] == ["user"]
+
+
 def test_build_kwargs_top_p_zero_is_sent():
     """top_p=0.0 should reach the API as top_p (greedy nucleus sampling),
     not silently fall through to temperature. The previous truthy check

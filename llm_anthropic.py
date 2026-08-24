@@ -334,6 +334,7 @@ def register_models(register):
         ClaudeMessages(
             "claude-opus-4-8",
             supports_pdf=True,
+            supports_system_messages=True,
             supports_thinking=True,
             supports_thinking_effort=True,
             supports_adaptive_thinking=True,
@@ -345,6 +346,7 @@ def register_models(register):
         AsyncClaudeMessages(
             "claude-opus-4-8",
             supports_pdf=True,
+            supports_system_messages=True,
             supports_thinking=True,
             supports_thinking_effort=True,
             supports_adaptive_thinking=True,
@@ -360,6 +362,7 @@ def register_models(register):
         ClaudeMessages(
             "claude-fable-5",
             supports_pdf=True,
+            supports_system_messages=True,
             thinks_by_default=True,
             always_thinks=True,
             supports_thinking=True,
@@ -373,6 +376,7 @@ def register_models(register):
         AsyncClaudeMessages(
             "claude-fable-5",
             supports_pdf=True,
+            supports_system_messages=True,
             thinks_by_default=True,
             always_thinks=True,
             supports_thinking=True,
@@ -390,6 +394,7 @@ def register_models(register):
         ClaudeMessages(
             "claude-sonnet-5",
             supports_pdf=True,
+            supports_system_messages=True,
             thinks_by_default=True,
             supports_thinking=True,
             supports_thinking_effort=True,
@@ -402,6 +407,7 @@ def register_models(register):
         AsyncClaudeMessages(
             "claude-sonnet-5",
             supports_pdf=True,
+            supports_system_messages=True,
             thinks_by_default=True,
             supports_thinking=True,
             supports_thinking_effort=True,
@@ -418,6 +424,7 @@ def register_models(register):
         ClaudeMessages(
             "claude-opus-5",
             supports_pdf=True,
+            supports_system_messages=True,
             thinks_by_default=True,
             supports_thinking=True,
             supports_thinking_effort=True,
@@ -430,6 +437,7 @@ def register_models(register):
         AsyncClaudeMessages(
             "claude-opus-5",
             supports_pdf=True,
+            supports_system_messages=True,
             thinks_by_default=True,
             supports_thinking=True,
             supports_thinking_effort=True,
@@ -834,6 +842,7 @@ class _Shared:
         thinks_by_default=False,
         always_thinks=False,
         use_structured_outputs=False,
+        supports_system_messages=False,
         default_max_tokens=None,
         base_url=None,
     ):
@@ -867,6 +876,7 @@ class _Shared:
         self.supports_code_execution = supports_code_execution
         self.thinks_by_default = thinks_by_default
         self.always_thinks = always_thinks
+        self.supports_system_messages = supports_system_messages
 
     @property
     def supported_server_side_tools(self):
@@ -1082,8 +1092,6 @@ class _Shared:
         """Append an Anthropic-shaped message, merging with the previous one
         if both would be user-side turns (tool_result + text in the same
         user message is the required shape for tool follow-ups)."""
-        if message.role == "system":
-            return  # system lives on the top-level kwargs["system"] field
         blocks = self._message_to_blocks(message)
         if not blocks:
             return
@@ -1094,6 +1102,35 @@ class _Shared:
             out[-1]["content"].extend(blocks)
         else:
             out.append({"role": anthropic_role, "content": blocks})
+
+    def _append_system_message(
+        self, out: List[Dict[str, Any]], message: Message, is_first: bool
+    ) -> None:
+        """Handle a system-role message from an explicit messages= chain.
+
+        The first message in the chain is hoisted to the top-level
+        kwargs["system"] field by _extract_system. Later ones become inline
+        role="system" entries on models that support mid-conversation
+        system messages (Opus 4.8 and the Claude 5 family)."""
+        if is_first:
+            return
+        if not self.supports_system_messages:
+            raise ValueError(
+                f"{self.claude_model_id} does not support mid-conversation "
+                "system messages - only the first message in messages= can "
+                "use role='system' with this model"
+            )
+        blocks = [
+            {"type": "text", "text": part.text}
+            for part in message.parts
+            if isinstance(part, TextPart)
+        ]
+        if not blocks:
+            return
+        if out and out[-1]["role"] == "system":
+            out[-1]["content"].extend(blocks)
+        else:
+            out.append({"role": "system", "content": blocks})
 
     def _append_prev_response_output(
         self, out: List[Dict[str, Any]], prev_response
@@ -1124,8 +1161,20 @@ class _Shared:
         # 0.32+ conversation and chain paths pre-bake the full input chain
         # here, so also walking conversation.responses would duplicate
         # prior turns and break tool-result ordering.
-        for message in prompt.messages:
-            self._append_message(messages, message)
+        for index, message in enumerate(prompt.messages):
+            if message.role == "system":
+                self._append_system_message(messages, message, index == 0)
+            else:
+                self._append_message(messages, message)
+
+        # The API requires an inline system entry to immediately follow a
+        # user turn (and precede an assistant turn or end the array), but
+        # authors naturally write new instructions before their next user
+        # message - so bubble each system entry past a directly following
+        # user turn.
+        for i in range(len(messages) - 1):
+            if messages[i]["role"] == "system" and messages[i + 1]["role"] == "user":
+                messages[i], messages[i + 1] = messages[i + 1], messages[i]
 
         # Cache control: apply to the last content block of the final
         # user-side turn, matching the pre-upgrade behavior.
@@ -1157,16 +1206,21 @@ class _Shared:
         """Pull the system prompt from prompt.messages or prompt.system.
 
         ``prompt.system`` already composes ``_system`` + ``system_fragments``;
-        if messages= was passed explicitly and it contains a system-role
-        message, fall back to reading that.
+        if messages= was passed explicitly and it *starts* with a system-role
+        message, fall back to reading that. Later system-role messages are
+        sent inline by _append_system_message instead, since the API forbids
+        a system entry in first position.
         """
         if prompt.system:
             return prompt.system
-        for message in prompt.messages:
-            if message.role == "system":
-                texts = [p.text for p in message.parts if isinstance(p, TextPart)]
-                if texts:
-                    return "\n\n".join(texts)
+        if prompt.messages and prompt.messages[0].role == "system":
+            texts = [
+                p.text
+                for p in prompt.messages[0].parts
+                if isinstance(p, TextPart)
+            ]
+            if texts:
+                return "\n\n".join(texts)
         return None
 
     def build_kwargs(self, prompt, conversation):
