@@ -1338,143 +1338,97 @@ class ClaudeMessages(_Shared, llm.KeyModel):
         else:
             messages_client = client.messages
 
-        if stream:
-            with messages_client.stream(**kwargs) as stream_obj:
-                current_block_id = None
-                current_block_name = None
-                is_server_tool = False
-                container = None
+        # Always use Anthropic's streaming transport, even when LLM has been
+        # asked to buffer the response for non-streaming presentation. The
+        # Anthropic SDK rejects non-streaming requests with large max_tokens
+        # values because they may take longer than ten minutes.
+        with messages_client.stream(**kwargs) as stream_obj:
+            current_block_id = None
+            current_block_name = None
+            is_server_tool = False
+            container = None
 
-                if prefill_text:
-                    yield StreamEvent(type="text", chunk=prefill_text)
+            if prefill_text:
+                yield StreamEvent(type="text", chunk=prefill_text)
 
-                for chunk in stream_obj:
-                    if chunk.type == "content_block_start":
-                        block = chunk.content_block
-                        block_type = getattr(block, "type", None)
-                        current_block_id = getattr(block, "id", None)
-                        current_block_name = getattr(block, "name", None)
-                        is_server_tool = block_type in (
-                            "server_tool_use",
-                            "mcp_tool_use",
-                        ) or (block_type or "").endswith("_tool_result")
+            for chunk in stream_obj:
+                if chunk.type == "content_block_start":
+                    block = chunk.content_block
+                    block_type = getattr(block, "type", None)
+                    current_block_id = getattr(block, "id", None)
+                    current_block_name = getattr(block, "name", None)
+                    is_server_tool = block_type in (
+                        "server_tool_use",
+                        "mcp_tool_use",
+                    ) or (block_type or "").endswith("_tool_result")
 
-                        if block_type in (
-                            "tool_use",
-                            "server_tool_use",
-                            "mcp_tool_use",
-                        ):
-                            yield StreamEvent(
-                                type="tool_call_name",
-                                chunk=current_block_name or "",
-                                tool_call_id=current_block_id,
-                                server_executed=(block_type != "tool_use"),
-                                provider_metadata=(
-                                    {
-                                        "anthropic": {
-                                            "mcp_server_name": getattr(
-                                                block, "server_name", None
-                                            )
-                                        }
+                    if block_type in (
+                        "tool_use",
+                        "server_tool_use",
+                        "mcp_tool_use",
+                    ):
+                        yield StreamEvent(
+                            type="tool_call_name",
+                            chunk=current_block_name or "",
+                            tool_call_id=current_block_id,
+                            server_executed=(block_type != "tool_use"),
+                            provider_metadata=(
+                                {
+                                    "anthropic": {
+                                        "mcp_server_name": getattr(
+                                            block, "server_name", None
+                                        )
                                     }
-                                    if block_type == "mcp_tool_use"
-                                    else None
-                                ),
-                            )
-                        elif block_type and block_type.endswith("_tool_result"):
-                            # Content is available inline on content_block_start
-                            yield self._server_tool_result_event(block_type, block)
-
-                    elif chunk.type == "content_block_delta":
-                        delta = chunk.delta
-                        delta_type = getattr(delta, "type", None)
-
-                        if delta_type == "thinking_delta":
-                            yield StreamEvent(type="reasoning", chunk=delta.thinking)
-                        elif delta_type == "signature_delta":
-                            yield StreamEvent(
-                                type="reasoning",
-                                chunk="",
-                                provider_metadata={
-                                    "anthropic": {"signature": delta.signature}
-                                },
-                            )
-                        elif delta_type == "text_delta":
-                            yield StreamEvent(type="text", chunk=delta.text)
-                        elif delta_type == "input_json_delta":
-                            yield StreamEvent(
-                                type="tool_call_args",
-                                chunk=delta.partial_json,
-                                tool_call_id=current_block_id,
-                                server_executed=is_server_tool,
-                            )
-
-                    elif chunk.type == "message_delta":
-                        chunk_container = getattr(chunk, "container", None) or getattr(
-                            getattr(chunk, "delta", None), "container", None
-                        )
-                        if chunk_container is not None:
-                            container = chunk_container
-
-                # This records usage and other data:
-                last_message = self._model_dump_suppress_warnings(
-                    stream_obj.get_final_message()
-                )
-                self._apply_container(last_message, container)
-                response.response_json = last_message
-
-                if self.add_tool_usage(response, last_message):
-                    # Avoid "can have dragons.Now that I " bug
-                    yield StreamEvent(type="text", chunk=" ")
-        else:
-            completion = messages_client.create(**kwargs)
-            for item in completion.content:
-                item_type = getattr(item, "type", None)
-                if item_type == "thinking":
-                    signature = getattr(item, "signature", None)
-                    yield StreamEvent(
-                        type="reasoning",
-                        chunk=item.thinking,
-                        provider_metadata=(
-                            {"anthropic": {"signature": signature}}
-                            if signature
-                            else None
-                        ),
-                    )
-                elif item_type == "text":
-                    text = (prefill_text + item.text) if prefill_text else item.text
-                    prefill_text = ""  # Only prepend once
-                    yield StreamEvent(type="text", chunk=text)
-                elif item_type in ("tool_use", "server_tool_use", "mcp_tool_use"):
-                    server_executed = item_type != "tool_use"
-                    yield StreamEvent(
-                        type="tool_call_name",
-                        chunk=item.name,
-                        tool_call_id=item.id,
-                        server_executed=server_executed,
-                        provider_metadata=(
-                            {
-                                "anthropic": {
-                                    "mcp_server_name": getattr(
-                                        item, "server_name", None
-                                    )
                                 }
-                            }
-                            if item_type == "mcp_tool_use"
-                            else None
-                        ),
+                                if block_type == "mcp_tool_use"
+                                else None
+                            ),
+                        )
+                    elif block_type and block_type.endswith("_tool_result"):
+                        # Content is available inline on content_block_start
+                        yield self._server_tool_result_event(block_type, block)
+
+                elif chunk.type == "content_block_delta":
+                    delta = chunk.delta
+                    delta_type = getattr(delta, "type", None)
+
+                    if delta_type == "thinking_delta":
+                        yield StreamEvent(type="reasoning", chunk=delta.thinking)
+                    elif delta_type == "signature_delta":
+                        yield StreamEvent(
+                            type="reasoning",
+                            chunk="",
+                            provider_metadata={
+                                "anthropic": {"signature": delta.signature}
+                            },
+                        )
+                    elif delta_type == "text_delta":
+                        yield StreamEvent(type="text", chunk=delta.text)
+                    elif delta_type == "input_json_delta":
+                        yield StreamEvent(
+                            type="tool_call_args",
+                            chunk=delta.partial_json,
+                            tool_call_id=current_block_id,
+                            server_executed=is_server_tool,
+                        )
+
+                elif chunk.type == "message_delta":
+                    chunk_container = getattr(chunk, "container", None) or getattr(
+                        getattr(chunk, "delta", None), "container", None
                     )
-                    yield StreamEvent(
-                        type="tool_call_args",
-                        chunk=json.dumps(item.input),
-                        tool_call_id=item.id,
-                        server_executed=server_executed,
-                    )
-                elif item_type and item_type.endswith("_tool_result"):
-                    yield self._server_tool_result_event(item_type, item)
-            response.response_json = completion.model_dump()
-            self._apply_container(response.response_json, None)
-            self.add_tool_usage(response, response.response_json)
+                    if chunk_container is not None:
+                        container = chunk_container
+
+            # This records usage and other data:
+            last_message = self._model_dump_suppress_warnings(
+                stream_obj.get_final_message()
+            )
+            self._apply_container(last_message, container)
+            response.response_json = last_message
+
+            if self.add_tool_usage(response, last_message):
+                # Avoid "can have dragons.Now that I " bug
+                yield StreamEvent(type="text", chunk=" ")
         self.set_usage(response)
 
 
@@ -1488,136 +1442,92 @@ class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
             messages_client = client.messages
         prefill_text = self.prefill_text(prompt)
 
-        if stream:
-            async with messages_client.stream(**kwargs) as stream_obj:
-                current_block_id = None
-                current_block_name = None
-                is_server_tool = False
-                container = None
+        # Always use Anthropic's streaming transport. LLM still controls
+        # whether the yielded events are displayed incrementally or buffered.
+        async with messages_client.stream(**kwargs) as stream_obj:
+            current_block_id = None
+            current_block_name = None
+            is_server_tool = False
+            container = None
 
-                if prefill_text:
-                    yield StreamEvent(type="text", chunk=prefill_text)
+            if prefill_text:
+                yield StreamEvent(type="text", chunk=prefill_text)
 
-                async for chunk in stream_obj:
-                    if chunk.type == "content_block_start":
-                        block = chunk.content_block
-                        block_type = getattr(block, "type", None)
-                        current_block_id = getattr(block, "id", None)
-                        current_block_name = getattr(block, "name", None)
-                        is_server_tool = block_type in (
-                            "server_tool_use",
-                            "mcp_tool_use",
-                        ) or (block_type or "").endswith("_tool_result")
+            async for chunk in stream_obj:
+                if chunk.type == "content_block_start":
+                    block = chunk.content_block
+                    block_type = getattr(block, "type", None)
+                    current_block_id = getattr(block, "id", None)
+                    current_block_name = getattr(block, "name", None)
+                    is_server_tool = block_type in (
+                        "server_tool_use",
+                        "mcp_tool_use",
+                    ) or (block_type or "").endswith("_tool_result")
 
-                        if block_type in (
-                            "tool_use",
-                            "server_tool_use",
-                            "mcp_tool_use",
-                        ):
-                            yield StreamEvent(
-                                type="tool_call_name",
-                                chunk=current_block_name or "",
-                                tool_call_id=current_block_id,
-                                server_executed=(block_type != "tool_use"),
-                                provider_metadata=(
-                                    {
-                                        "anthropic": {
-                                            "mcp_server_name": getattr(
-                                                block, "server_name", None
-                                            )
-                                        }
+                    if block_type in (
+                        "tool_use",
+                        "server_tool_use",
+                        "mcp_tool_use",
+                    ):
+                        yield StreamEvent(
+                            type="tool_call_name",
+                            chunk=current_block_name or "",
+                            tool_call_id=current_block_id,
+                            server_executed=(block_type != "tool_use"),
+                            provider_metadata=(
+                                {
+                                    "anthropic": {
+                                        "mcp_server_name": getattr(
+                                            block, "server_name", None
+                                        )
                                     }
-                                    if block_type == "mcp_tool_use"
-                                    else None
-                                ),
-                            )
-                        elif block_type and block_type.endswith("_tool_result"):
-                            yield self._server_tool_result_event(block_type, block)
-
-                    elif chunk.type == "content_block_delta":
-                        delta = chunk.delta
-                        delta_type = getattr(delta, "type", None)
-
-                        if delta_type == "thinking_delta":
-                            yield StreamEvent(type="reasoning", chunk=delta.thinking)
-                        elif delta_type == "signature_delta":
-                            yield StreamEvent(
-                                type="reasoning",
-                                chunk="",
-                                provider_metadata={
-                                    "anthropic": {"signature": delta.signature}
-                                },
-                            )
-                        elif delta_type == "text_delta":
-                            yield StreamEvent(type="text", chunk=delta.text)
-                        elif delta_type == "input_json_delta":
-                            yield StreamEvent(
-                                type="tool_call_args",
-                                chunk=delta.partial_json,
-                                tool_call_id=current_block_id,
-                                server_executed=is_server_tool,
-                            )
-
-                    elif chunk.type == "message_delta":
-                        chunk_container = getattr(chunk, "container", None) or getattr(
-                            getattr(chunk, "delta", None), "container", None
+                                }
+                                if block_type == "mcp_tool_use"
+                                else None
+                            ),
                         )
-                        if chunk_container is not None:
-                            container = chunk_container
+                    elif block_type and block_type.endswith("_tool_result"):
+                        yield self._server_tool_result_event(block_type, block)
 
-            response.response_json = self._model_dump_suppress_warnings(
+                elif chunk.type == "content_block_delta":
+                    delta = chunk.delta
+                    delta_type = getattr(delta, "type", None)
+
+                    if delta_type == "thinking_delta":
+                        yield StreamEvent(type="reasoning", chunk=delta.thinking)
+                    elif delta_type == "signature_delta":
+                        yield StreamEvent(
+                            type="reasoning",
+                            chunk="",
+                            provider_metadata={
+                                "anthropic": {"signature": delta.signature}
+                            },
+                        )
+                    elif delta_type == "text_delta":
+                        yield StreamEvent(type="text", chunk=delta.text)
+                    elif delta_type == "input_json_delta":
+                        yield StreamEvent(
+                            type="tool_call_args",
+                            chunk=delta.partial_json,
+                            tool_call_id=current_block_id,
+                            server_executed=is_server_tool,
+                        )
+
+                elif chunk.type == "message_delta":
+                    chunk_container = getattr(chunk, "container", None) or getattr(
+                        getattr(chunk, "delta", None), "container", None
+                    )
+                    if chunk_container is not None:
+                        container = chunk_container
+
+            # This records usage and other data:
+            last_message = self._model_dump_suppress_warnings(
                 await stream_obj.get_final_message()
             )
-            self._apply_container(response.response_json, container)
+            self._apply_container(last_message, container)
+            response.response_json = last_message
 
-            self.add_tool_usage(response, response.response_json)
-        else:
-            completion = await messages_client.create(**kwargs)
-            for item in completion.content:
-                item_type = getattr(item, "type", None)
-                if item_type == "thinking":
-                    signature = getattr(item, "signature", None)
-                    yield StreamEvent(
-                        type="reasoning",
-                        chunk=item.thinking,
-                        provider_metadata=(
-                            {"anthropic": {"signature": signature}}
-                            if signature
-                            else None
-                        ),
-                    )
-                elif item_type == "text":
-                    text = (prefill_text + item.text) if prefill_text else item.text
-                    prefill_text = ""
-                    yield StreamEvent(type="text", chunk=text)
-                elif item_type in ("tool_use", "server_tool_use", "mcp_tool_use"):
-                    server_executed = item_type != "tool_use"
-                    yield StreamEvent(
-                        type="tool_call_name",
-                        chunk=item.name,
-                        tool_call_id=item.id,
-                        server_executed=server_executed,
-                        provider_metadata=(
-                            {
-                                "anthropic": {
-                                    "mcp_server_name": getattr(
-                                        item, "server_name", None
-                                    )
-                                }
-                            }
-                            if item_type == "mcp_tool_use"
-                            else None
-                        ),
-                    )
-                    yield StreamEvent(
-                        type="tool_call_args",
-                        chunk=json.dumps(item.input),
-                        tool_call_id=item.id,
-                        server_executed=server_executed,
-                    )
-                elif item_type and item_type.endswith("_tool_result"):
-                    yield self._server_tool_result_event(item_type, item)
-            response.response_json = completion.model_dump()
-            self._apply_container(response.response_json, None)
-            self.add_tool_usage(response, response.response_json)
+            if self.add_tool_usage(response, last_message):
+                # Avoid "can have dragons.Now that I " bug
+                yield StreamEvent(type="text", chunk=" ")
         self.set_usage(response)

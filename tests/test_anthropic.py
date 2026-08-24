@@ -1,5 +1,6 @@
 import json
 import llm
+import llm_anthropic
 import os
 import pytest
 from inline_snapshot import snapshot
@@ -96,6 +97,100 @@ async def test_async_prompt():
     assert response.token_details is None
     response2 = await conversation.prompt("in french")
     assert await response2.text() == snapshot("- Capitaine\n- Bec (beak)")
+
+
+def test_no_stream_uses_streaming_transport(monkeypatch):
+    from types import SimpleNamespace
+
+    calls = []
+
+    class FakeStream:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            pass
+
+        def __iter__(self):
+            yield SimpleNamespace(
+                type="content_block_delta",
+                delta=SimpleNamespace(type="text_delta", text="hi"),
+            )
+
+        def get_final_message(self):
+            return SimpleNamespace(
+                model_dump=lambda: {
+                    "content": [{"type": "text", "text": "hi"}],
+                    "usage": {"input_tokens": 1, "output_tokens": 1},
+                }
+            )
+
+    class FakeMessages:
+        def stream(self, **kwargs):
+            calls.append(kwargs)
+            return FakeStream()
+
+        def create(self, **kwargs):
+            raise AssertionError("Non-streaming Anthropic transport was used")
+
+    messages = FakeMessages()
+    client = SimpleNamespace(messages=messages, beta=SimpleNamespace(messages=messages))
+    monkeypatch.setattr(llm_anthropic, "Anthropic", lambda **kwargs: client)
+
+    model = llm.get_model("claude-sonnet-4.5")
+    response = model.prompt("hi", stream=False, key="sk-test")
+
+    assert response.text() == "hi"
+    assert calls[0]["max_tokens"] == 64000
+
+
+@pytest.mark.asyncio
+async def test_async_no_stream_uses_streaming_transport(monkeypatch):
+    from types import SimpleNamespace
+
+    calls = []
+
+    class FakeStream:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc_value, traceback):
+            pass
+
+        def __aiter__(self):
+            async def events():
+                yield SimpleNamespace(
+                    type="content_block_delta",
+                    delta=SimpleNamespace(type="text_delta", text="hi"),
+                )
+
+            return events()
+
+        async def get_final_message(self):
+            return SimpleNamespace(
+                model_dump=lambda: {
+                    "content": [{"type": "text", "text": "hi"}],
+                    "usage": {"input_tokens": 1, "output_tokens": 1},
+                }
+            )
+
+    class FakeMessages:
+        def stream(self, **kwargs):
+            calls.append(kwargs)
+            return FakeStream()
+
+        async def create(self, **kwargs):
+            raise AssertionError("Non-streaming Anthropic transport was used")
+
+    messages = FakeMessages()
+    client = SimpleNamespace(messages=messages, beta=SimpleNamespace(messages=messages))
+    monkeypatch.setattr(llm_anthropic, "AsyncAnthropic", lambda **kwargs: client)
+
+    model = llm.get_async_model("claude-sonnet-4.5")
+    response = await model.prompt("hi", stream=False, key="sk-test")
+
+    assert await response.text() == "hi"
+    assert calls[0]["max_tokens"] == 64000
 
 
 @pytest.mark.vcr
