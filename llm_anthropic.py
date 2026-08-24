@@ -1163,7 +1163,7 @@ class _Shared:
         # anthropic>=1 removed temperature/top_p/top_k from the method
         # signatures; the API still accepts them, so send via extra_body
         extra_body = {}
-        if prompt.options.top_p:
+        if prompt.options.top_p is not None:
             extra_body["top_p"] = prompt.options.top_p
         else:
             extra_body["temperature"] = (
