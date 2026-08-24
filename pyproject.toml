@@ -9,7 +9,7 @@ requires-python = ">=3.10"
 classifiers = []
 dependencies = [
     "llm>=0.32",
-    "anthropic>=0.96.0",
+    "anthropic>=1,<2",
 ]
 
 [project.urls]
@@ -22,7 +22,15 @@ CI = "https://github.com/simonw/llm-anthropic/actions"
 anthropic = "llm_anthropic"
 
 [dependency-groups]
-dev = ["pytest", "pytest-recording", "pytest-asyncio", "cogapp", "inline-snapshot[black]"]
+dev = [
+    "pytest",
+    "pytest-recording",
+    # vcrpy 8.3+ can record/replay httpx2, used by anthropic>=1
+    "vcrpy>=8.3",
+    "pytest-asyncio",
+    "cogapp",
+    "inline-snapshot[black]",
+]
 
 [tool.uv]
 package = true

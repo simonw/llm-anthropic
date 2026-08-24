@@ -1158,17 +1158,23 @@ class _Shared:
         if prompt.options.user_id:
             kwargs["metadata"] = {"user_id": prompt.options.user_id}
 
+        # anthropic>=1 removed temperature/top_p/top_k from the method
+        # signatures; the API still accepts them, so send via extra_body
+        extra_body = {}
         if prompt.options.top_p:
-            kwargs["top_p"] = prompt.options.top_p
+            extra_body["top_p"] = prompt.options.top_p
         else:
-            kwargs["temperature"] = (
+            extra_body["temperature"] = (
                 prompt.options.temperature
                 if prompt.options.temperature is not None
                 else DEFAULT_TEMPERATURE
             )
 
         if prompt.options.top_k:
-            kwargs["top_k"] = prompt.options.top_k
+            extra_body["top_k"] = prompt.options.top_k
+
+        if extra_body:
+            kwargs["extra_body"] = extra_body
 
         system = self._extract_system(prompt)
         if system:
@@ -1240,7 +1246,7 @@ class _Shared:
         if max_tokens > 64000 and not self.supports_adaptive_thinking:
             betas.append("output-128k-2025-02-19")
             if "thinking" in kwargs:
-                kwargs["extra_body"] = {"thinking": kwargs.pop("thinking")}
+                kwargs.setdefault("extra_body", {})["thinking"] = kwargs.pop("thinking")
 
         # Check if we should use new structured outputs
         use_structured_outputs = prompt.schema and self.use_structured_outputs
