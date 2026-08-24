@@ -1693,3 +1693,392 @@ def test_thinking_effort_still_works():
     kwargs = model.build_kwargs(prompt, None)
     assert kwargs["thinking"] == {"type": "adaptive"}
     assert kwargs["output_config"]["effort"] == "max"
+
+
+# --- Preserving omitted and redacted_thinking blocks (issue #81) ----------
+#
+# Anthropic requires every thinking block - visible, omitted (empty text
+# plus signature) and redacted_thinking (opaque data) - to be replayed
+# complete, unmodified and in order during tool-use continuations.
+# These tests drive execute() with a faked Anthropic stream and check
+# the assembled parts and the blocks a continuation request would send.
+
+
+def _thinking_stream_chunks():
+    """Visible thinking, redacted_thinking, second visible thinking
+    (adjacent same-kind blocks must stay distinct), then a tool call."""
+    from types import SimpleNamespace as ns
+
+    return [
+        ns(
+            type="content_block_start",
+            index=0,
+            content_block=ns(type="thinking", thinking="", signature=""),
+        ),
+        ns(
+            type="content_block_delta",
+            index=0,
+            delta=ns(type="thinking_delta", thinking="first thoughts"),
+        ),
+        ns(
+            type="content_block_delta",
+            index=0,
+            delta=ns(type="signature_delta", signature="SIG-0"),
+        ),
+        ns(type="content_block_stop", index=0),
+        ns(
+            type="content_block_start",
+            index=1,
+            content_block=ns(type="redacted_thinking", data="OPAQUE-1"),
+        ),
+        ns(type="content_block_stop", index=1),
+        ns(
+            type="content_block_start",
+            index=2,
+            content_block=ns(type="thinking", thinking="", signature=""),
+        ),
+        ns(
+            type="content_block_delta",
+            index=2,
+            delta=ns(type="thinking_delta", thinking="second thoughts"),
+        ),
+        ns(
+            type="content_block_delta",
+            index=2,
+            delta=ns(type="signature_delta", signature="SIG-2"),
+        ),
+        ns(type="content_block_stop", index=2),
+        ns(
+            type="content_block_start",
+            index=3,
+            content_block=ns(type="tool_use", id="call-1", name="clock", input={}),
+        ),
+        ns(
+            type="content_block_delta",
+            index=3,
+            delta=ns(type="input_json_delta", partial_json="{}"),
+        ),
+        ns(type="content_block_stop", index=3),
+    ]
+
+
+_THINKING_FINAL_MESSAGE = {
+    "content": [
+        {"type": "thinking", "thinking": "first thoughts", "signature": "SIG-0"},
+        {"type": "redacted_thinking", "data": "OPAQUE-1"},
+        {"type": "thinking", "thinking": "second thoughts", "signature": "SIG-2"},
+        {"type": "tool_use", "id": "call-1", "name": "clock", "input": {}},
+    ],
+    "usage": {"input_tokens": 5, "output_tokens": 10},
+}
+
+
+def _omitted_stream_chunks():
+    """display: omitted - empty thinking block, signature only, then text."""
+    from types import SimpleNamespace as ns
+
+    return [
+        ns(
+            type="content_block_start",
+            index=0,
+            content_block=ns(type="thinking", thinking="", signature=""),
+        ),
+        ns(
+            type="content_block_delta",
+            index=0,
+            delta=ns(type="signature_delta", signature="SIG-OMITTED"),
+        ),
+        ns(type="content_block_stop", index=0),
+        ns(
+            type="content_block_start",
+            index=1,
+            content_block=ns(type="text", text=""),
+        ),
+        ns(
+            type="content_block_delta",
+            index=1,
+            delta=ns(type="text_delta", text="Hi there"),
+        ),
+        ns(type="content_block_stop", index=1),
+    ]
+
+
+_OMITTED_FINAL_MESSAGE = {
+    "content": [
+        {"type": "thinking", "thinking": "", "signature": "SIG-OMITTED"},
+        {"type": "text", "text": "Hi there"},
+    ],
+    "usage": {"input_tokens": 5, "output_tokens": 10},
+}
+
+
+def _patch_fake_stream(monkeypatch, chunks, final_message, asynchronous=False):
+    from types import SimpleNamespace
+    import copy
+
+    class FakeStream:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc_value, traceback):
+            pass
+
+        def __iter__(self):
+            return iter(chunks)
+
+        def __aiter__(self):
+            async def events():
+                for chunk in chunks:
+                    yield chunk
+
+            return events()
+
+        def _final(self):
+            return SimpleNamespace(model_dump=lambda: copy.deepcopy(final_message))
+
+        def get_final_message(self):
+            return self._final()
+
+    class FakeAsyncStream(FakeStream):
+        async def get_final_message(self):
+            return self._final()
+
+    class FakeMessages:
+        def stream(self, **kwargs):
+            return FakeAsyncStream() if asynchronous else FakeStream()
+
+    messages = FakeMessages()
+    client = SimpleNamespace(messages=messages, beta=SimpleNamespace(messages=messages))
+    name = "AsyncAnthropic" if asynchronous else "Anthropic"
+    monkeypatch.setattr(llm_anthropic, name, lambda **kwargs: client)
+
+
+def _assert_thinking_sequence_preserved(model, messages, text):
+    from llm.parts import ReasoningPart
+
+    assert "first thoughts" not in text
+    assert "OPAQUE-1" not in text
+    assert "SIG-0" not in text
+
+    assistant_messages = [m for m in messages if m.role == "assistant"]
+    reasoning = [
+        part
+        for message in assistant_messages
+        for part in message.parts
+        if isinstance(part, ReasoningPart)
+    ]
+    assert [part.to_dict() for part in reasoning] == [
+        {
+            "type": "reasoning",
+            "text": "first thoughts",
+            "provider_metadata": {"anthropic": {"signature": "SIG-0"}},
+        },
+        {
+            "type": "reasoning",
+            "text": "",
+            "provider_metadata": {
+                "anthropic": {"type": "redacted_thinking", "data": "OPAQUE-1"}
+            },
+        },
+        {
+            "type": "reasoning",
+            "text": "second thoughts",
+            "provider_metadata": {"anthropic": {"signature": "SIG-2"}},
+        },
+    ]
+    # None of the opaque parts are hoisted or reordered
+    assert not any(part.redacted for part in reasoning)
+
+    # A continuation request must replay the complete original
+    # thinking-block sequence before the tool_use block.
+    blocks = [
+        block
+        for message in assistant_messages
+        for block in model._message_to_blocks(message)
+    ]
+    assert blocks == [
+        {"type": "thinking", "thinking": "first thoughts", "signature": "SIG-0"},
+        {"type": "redacted_thinking", "data": "OPAQUE-1"},
+        {"type": "thinking", "thinking": "second thoughts", "signature": "SIG-2"},
+        {"type": "tool_use", "id": "call-1", "name": "clock", "input": {}},
+    ]
+
+
+def test_redacted_thinking_stream_preserved(monkeypatch):
+    _patch_fake_stream(monkeypatch, _thinking_stream_chunks(), _THINKING_FINAL_MESSAGE)
+    model = llm.get_model("claude-opus-5")
+    response = model.prompt("hi", key="sk-test")
+    _assert_thinking_sequence_preserved(model, response.messages(), response.text())
+
+
+def test_redacted_thinking_no_stream_preserved(monkeypatch):
+    _patch_fake_stream(monkeypatch, _thinking_stream_chunks(), _THINKING_FINAL_MESSAGE)
+    model = llm.get_model("claude-opus-5")
+    response = model.prompt("hi", stream=False, key="sk-test")
+    _assert_thinking_sequence_preserved(model, response.messages(), response.text())
+
+
+@pytest.mark.asyncio
+async def test_async_redacted_thinking_stream_preserved(monkeypatch):
+    _patch_fake_stream(
+        monkeypatch,
+        _thinking_stream_chunks(),
+        _THINKING_FINAL_MESSAGE,
+        asynchronous=True,
+    )
+    model = llm.get_async_model("claude-opus-5")
+    response = await model.prompt("hi", key="sk-test")
+    text = await response.text()
+    _assert_thinking_sequence_preserved(model, await response.messages(), text)
+
+
+@pytest.mark.asyncio
+async def test_async_redacted_thinking_no_stream_preserved(monkeypatch):
+    _patch_fake_stream(
+        monkeypatch,
+        _thinking_stream_chunks(),
+        _THINKING_FINAL_MESSAGE,
+        asynchronous=True,
+    )
+    model = llm.get_async_model("claude-opus-5")
+    response = await model.prompt("hi", stream=False, key="sk-test")
+    text = await response.text()
+    _assert_thinking_sequence_preserved(model, await response.messages(), text)
+
+
+def _assert_omitted_signature_preserved(model, messages, text):
+    from llm.parts import ReasoningPart
+
+    assert text == "Hi there"
+
+    assistant_messages = [m for m in messages if m.role == "assistant"]
+    reasoning = [
+        part
+        for message in assistant_messages
+        for part in message.parts
+        if isinstance(part, ReasoningPart)
+    ]
+    assert [part.to_dict() for part in reasoning] == [
+        {
+            "type": "reasoning",
+            "text": "",
+            "provider_metadata": {"anthropic": {"signature": "SIG-OMITTED"}},
+        }
+    ]
+    blocks = [
+        block
+        for message in assistant_messages
+        for block in model._message_to_blocks(message)
+    ]
+    assert blocks == [
+        {"type": "thinking", "thinking": "", "signature": "SIG-OMITTED"},
+        {"type": "text", "text": "Hi there"},
+    ]
+
+
+def test_omitted_thinking_stream_preserved(monkeypatch):
+    _patch_fake_stream(monkeypatch, _omitted_stream_chunks(), _OMITTED_FINAL_MESSAGE)
+    model = llm.get_model("claude-opus-5")
+    response = model.prompt("hi", key="sk-test")
+    _assert_omitted_signature_preserved(model, response.messages(), response.text())
+
+
+@pytest.mark.asyncio
+async def test_async_omitted_thinking_stream_preserved(monkeypatch):
+    _patch_fake_stream(
+        monkeypatch,
+        _omitted_stream_chunks(),
+        _OMITTED_FINAL_MESSAGE,
+        asynchronous=True,
+    )
+    model = llm.get_async_model("claude-opus-5")
+    response = await model.prompt("hi", key="sk-test")
+    text = await response.text()
+    _assert_omitted_signature_preserved(model, await response.messages(), text)
+
+
+def test_redacted_thinking_survives_log_store_round_trip(monkeypatch):
+    """The content-addressed message store persists reasoning parts with
+    their provider_metadata, so a conversation reloaded by llm -c can
+    replay the exact thinking-block sequence after a CLI restart."""
+    import sqlite_utils
+    from llm.logs import LogStore
+    from llm.migrations import migrate
+
+    _patch_fake_stream(monkeypatch, _thinking_stream_chunks(), _THINKING_FINAL_MESSAGE)
+    model = llm.get_model("claude-opus-5")
+    response = model.prompt("hi", key="sk-test")
+    text = response.text()
+
+    db = sqlite_utils.Database(memory=True)
+    migrate(db)
+    store = LogStore(db)
+    turn_id = store.log(response)
+    thread_id = list(db.query("select thread_id from turns where id = ?", [turn_id]))[
+        0
+    ]["thread_id"]
+
+    loaded_messages = store.thread_messages(thread_id)
+    _assert_thinking_sequence_preserved(model, loaded_messages, text)
+
+
+def test_build_messages_redacted_thinking_round_trips():
+    """Redacted metadata reconstructs an exact redacted_thinking block,
+    in position, and ordinary reasoning is never turned into one."""
+    from llm import assistant, user
+    from llm.parts import ReasoningPart, ToolCallPart
+
+    msgs = _build_messages_for(
+        {
+            "messages": [
+                user("q"),
+                assistant(
+                    ReasoningPart(
+                        text="visible",
+                        provider_metadata={"anthropic": {"signature": "sig-1"}},
+                    ),
+                    ReasoningPart(
+                        text="",
+                        provider_metadata={
+                            "anthropic": {
+                                "type": "redacted_thinking",
+                                "data": "opaque-data",
+                            }
+                        },
+                    ),
+                    ReasoningPart(
+                        text="",
+                        provider_metadata={"anthropic": {"signature": "sig-2"}},
+                    ),
+                    ToolCallPart(name="clock", arguments={}, tool_call_id="c1"),
+                ),
+            ]
+        }
+    )
+    assert msgs[1]["content"] == [
+        {"type": "thinking", "thinking": "visible", "signature": "sig-1"},
+        {"type": "redacted_thinking", "data": "opaque-data"},
+        {"type": "thinking", "thinking": "", "signature": "sig-2"},
+        {"type": "tool_use", "id": "c1", "name": "clock", "input": {}},
+    ]
+
+
+def test_build_messages_plain_reasoning_not_invented_as_redacted():
+    from llm import assistant, user
+    from llm.parts import ReasoningPart
+
+    msgs = _build_messages_for(
+        {
+            "messages": [
+                user("q"),
+                assistant(ReasoningPart(text="thoughts", redacted=True)),
+            ]
+        }
+    )
+    assert msgs[1]["content"] == [{"type": "thinking", "thinking": "thoughts"}]
