@@ -53,7 +53,7 @@ Image attachments are supported too:
 llm -m claude-sonnet-5 'describe this image' -a https://static.simonwillison.net/static/2024/pelicans.jpg
 llm -m claude-haiku-4.5 'extract text' -a page.png
 ```
-The Claude 3.5 and 4 models can handle PDF files:
+Claude 3.5 and later models can handle PDF files:
 ```bash
 llm -m claude-sonnet-5 'extract text' -a page.pdf
 ```
@@ -220,6 +220,27 @@ model = ClaudeMessages(
 print(model.prompt("Fun facts about pangolins", key="eyJh..."))
 ```
 
+## Mid-conversation system messages
+
+Claude Opus 4.8 and the Claude 5 family models accept [updated system instructions part-way through a conversation](https://platform.claude.com/docs/en/build-with-claude/mid-conversation-system-messages), which preserves prompt cache hits on earlier turns. Pass a `system` message in an explicit `messages=` chain:
+
+```python
+import llm
+from llm import system, user, assistant
+
+model = llm.get_model("claude-opus-5")
+response = model.prompt(messages=[
+    system("You are a helpful assistant."),
+    user("Say hi to me, briefly"),
+    assistant("Hi there!"),
+    system("New instruction: reply only in French from now on"),
+    user("Say goodbye to me, briefly"),
+])
+print(response.text())  # Au revoir !
+```
+
+The first system message is sent as the top-level system prompt; later ones are sent inline in the messages array, positioned automatically to satisfy the API's placement rules. Models older than Opus 4.8 raise a `ValueError` if a system message appears anywhere other than the start of the chain.
+
 ## Extended thinking
 
 Anthropic models can spend [thinking tokens](https://platform.claude.com/docs/en/build-with-claude/extended-thinking) reasoning through a prompt before producing their response. LLM streams that reasoning to standard error as it arrives - pass `-R/--hide-reasoning` to hide it. The reasoning is also logged, available as the `reasoning` field in `llm logs --json`.
@@ -320,6 +341,8 @@ cog.out("".join(output))
     Enable thinking mode. Claude 5 models think by default - set to false to disable thinking on models that allow it
 
 <!-- [[[end]]] -->
+
+Claude 5 models no longer accept sampling parameters - setting `temperature`, `top_p` or `top_k` on those models returns an error from the Anthropic API.
 
 The `prefill` option can be used to set the first part of the response. To increase the chance of returning JSON, set that to `{`:
 
