@@ -1284,18 +1284,22 @@ class _Shared:
                         "type": "enabled",
                         "budget_tokens": DEFAULT_THINKING_TOKENS,
                     }
-            elif self.thinks_by_default and hide_reasoning:
+            elif self.thinks_by_default:
                 # No thinking option set, but the model will think anyway -
-                # send the param explicitly so display can be omitted below
+                # send the param explicitly so display can be set below
                 kwargs["thinking"] = {"type": "adaptive"}
 
-            if (
-                hide_reasoning
-                and "thinking" in kwargs
-                and kwargs["thinking"]["type"] != "disabled"
-            ):
-                # -R / hide_reasoning=True asks the API to leave the
-                # thinking trace out of the response entirely
+            if "thinking" in kwargs and kwargs["thinking"]["type"] == "adaptive":
+                if hide_reasoning:
+                    # -R / hide_reasoning=True asks the API to leave the
+                    # thinking trace out of the response entirely
+                    kwargs["thinking"]["display"] = "omitted"
+                else:
+                    # Claude 4.7 and later default to display: omitted,
+                    # which streams thinking blocks with empty text. Ask
+                    # for the summarized trace so it can be shown and logged.
+                    kwargs["thinking"]["display"] = "summarized"
+            elif hide_reasoning and kwargs.get("thinking", {}).get("type") == "enabled":
                 kwargs["thinking"]["display"] = "omitted"
 
         # Handle effort in output_config

@@ -534,7 +534,7 @@ def test_opus_5_kwargs():
     kwargs = model.build_kwargs(prompt, None)
     assert kwargs["model"] == "claude-opus-5"
     assert kwargs["max_tokens"] == 128000
-    assert kwargs["thinking"] == {"type": "adaptive"}
+    assert kwargs["thinking"] == {"type": "adaptive", "display": "summarized"}
     assert kwargs["output_config"]["effort"] == "max"
     assert "betas" not in kwargs
 
@@ -1684,7 +1684,7 @@ def test_thinking_true_adaptive_on_46():
     model = llm.get_model("claude-sonnet-4.6")
     prompt = llm.Prompt("Hi", model, options=model.Options(thinking=True))
     kwargs = model.build_kwargs(prompt, None)
-    assert kwargs["thinking"] == {"type": "adaptive"}
+    assert kwargs["thinking"] == {"type": "adaptive", "display": "summarized"}
 
 
 def test_thinking_true_enabled_on_pre_46():
@@ -1708,9 +1708,18 @@ def test_thinking_false_fable_raises():
         model.build_kwargs(prompt, None)
 
 
-def test_thinking_unset_sends_no_param():
-    # 5-family models think by default server-side; we send nothing
+def test_thinking_unset_sends_adaptive_summarized():
+    # 5-family models think by default server-side, but their default
+    # display is omitted (empty thinking text) - ask for the summary
     model = llm.get_model("claude-sonnet-5")
+    prompt = llm.Prompt("Hi", model, options=model.Options())
+    kwargs = model.build_kwargs(prompt, None)
+    assert kwargs["thinking"] == {"type": "adaptive", "display": "summarized"}
+
+
+def test_thinking_unset_sends_no_param_on_pre_5():
+    # Models that only think when asked: send nothing
+    model = llm.get_model("claude-sonnet-4.6")
     prompt = llm.Prompt("Hi", model, options=model.Options())
     kwargs = model.build_kwargs(prompt, None)
     assert "thinking" not in kwargs
@@ -1755,7 +1764,7 @@ def test_thinking_effort_still_works():
     model = llm.get_model("claude-sonnet-5")
     prompt = llm.Prompt("Hi", model, options=model.Options(thinking_effort="max"))
     kwargs = model.build_kwargs(prompt, None)
-    assert kwargs["thinking"] == {"type": "adaptive"}
+    assert kwargs["thinking"] == {"type": "adaptive", "display": "summarized"}
     assert kwargs["output_config"]["effort"] == "max"
 
 
