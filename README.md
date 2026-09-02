@@ -234,7 +234,7 @@ Anthropic models can spend [thinking tokens](https://platform.claude.com/docs/en
 ```bash
 llm -m claude-opus-5 -o thinking_effort max 'Design a fair algorithm for splitting rent between roommates with different sized rooms'
 ```
-Sonnet 5 and Opus 5 can have thinking turned off entirely with `-o thinking 0`. Fable 5 always thinks - disabling it raises an error.
+Sonnet 5 and Opus 5 can have thinking turned off entirely with `-o thinking 0`. Fable models always think - disabling it raises an error.
 
 **Claude 4.6 and older models do not think unless asked.** Enable thinking with `-o thinking 1`:
 
