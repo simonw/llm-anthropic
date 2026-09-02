@@ -1438,15 +1438,22 @@ class _Shared:
         usage = response.response_json.pop("usage")
         input_tokens = usage.pop("input_tokens")
         output_tokens = usage.pop("output_tokens")
-        # Only include usage details if prompt caching was on, web search was
-        # used, or the API reported a thinking token breakdown
+        # Include the full usage details if prompt caching was on or web
+        # search was used. Otherwise only record the thinking token
+        # breakdown, if the API reported one, and a non-standard service
+        # tier - the rest of the usage dict is zero cache counters and
+        # routing metadata
         details = None
-        if (
-            response.prompt.options.cache
-            or usage.get("server_tool_use")
-            or usage.get("output_tokens_details")
-        ):
+        if response.prompt.options.cache or usage.get("server_tool_use"):
             details = usage
+        else:
+            details = {}
+            if usage.get("output_tokens_details"):
+                details["output_tokens_details"] = usage["output_tokens_details"]
+            service_tier = usage.get("service_tier")
+            if service_tier and service_tier != "standard":
+                details["service_tier"] = service_tier
+            details = details or None
         response.set_usage(input=input_tokens, output=output_tokens, details=details)
 
     def raise_if_refused(self, response):

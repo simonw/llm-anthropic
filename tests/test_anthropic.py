@@ -492,8 +492,9 @@ def test_fixed_version_tool_chain_with_thinking_display_regression():
     ]
     assert reasoning_parts[0].provider_metadata["anthropic"]["signature"]
     assert first_response.output_tokens == 92
-    assert first_response.token_details["output_tokens_details"] == {
-        "thinking_tokens": 53
+    # Only the thinking breakdown is recorded, not the rest of the usage dict
+    assert first_response.token_details == {
+        "output_tokens_details": {"thinking_tokens": 53}
     }
 
     second_response = chain_response._responses[1]
@@ -1747,6 +1748,85 @@ def test_thinking_false_sends_disabled():
     prompt = llm.Prompt("Hi", model, options=model.Options(thinking=False))
     kwargs = model.build_kwargs(prompt, None)
     assert kwargs["thinking"] == {"type": "disabled"}
+
+
+class _FakeResponse:
+    """Minimal stand-in for llm.Response, enough to exercise set_usage()"""
+
+    def __init__(self, usage, cache=False):
+        self.response_json = {"usage": dict(usage)}
+        self.prompt = llm.Prompt(
+            "Hi", llm.get_model("claude-opus-5"), options=ClaudeOptions(cache=cache)
+        )
+        self.recorded = None
+
+    def set_usage(self, input, output, details):
+        self.recorded = (input, output, details)
+
+
+FULL_USAGE = {
+    "input_tokens": 10,
+    "output_tokens": 20,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": {"ephemeral_1h_input_tokens": 0, "ephemeral_5m_input_tokens": 0},
+    "inference_geo": "global",
+    "service_tier": "standard",
+    "server_tool_use": None,
+    "output_tokens_details": {"thinking_tokens": 7},
+}
+
+
+@pytest.mark.parametrize(
+    "usage,cache,expected_details",
+    (
+        # Nothing interesting reported: no details at all
+        (
+            {"input_tokens": 10, "output_tokens": 20, "cache_read_input_tokens": 0},
+            False,
+            None,
+        ),
+        # Thinking breakdown only: record just that, not the noise
+        (FULL_USAGE, False, {"output_tokens_details": {"thinking_tokens": 7}}),
+        # A non-standard service tier is worth keeping
+        (
+            {**FULL_USAGE, "service_tier": "priority"},
+            False,
+            {
+                "output_tokens_details": {"thinking_tokens": 7},
+                "service_tier": "priority",
+            },
+        ),
+        # ... even when there is no thinking breakdown
+        (
+            {"input_tokens": 10, "output_tokens": 20, "service_tier": "batch"},
+            False,
+            {"service_tier": "batch"},
+        ),
+        # Prompt caching on: keep the whole usage dict
+        (
+            FULL_USAGE,
+            True,
+            {k: v for k, v in FULL_USAGE.items() if k not in ("input_tokens", "output_tokens")},
+        ),
+        # Server-side tool use: keep the whole usage dict
+        (
+            {**FULL_USAGE, "server_tool_use": {"web_search_requests": 2}},
+            False,
+            {
+                **{k: v for k, v in FULL_USAGE.items() if k not in ("input_tokens", "output_tokens")},
+                "server_tool_use": {"web_search_requests": 2},
+            },
+        ),
+    ),
+)
+def test_set_usage_details(usage, cache, expected_details):
+    model = llm.get_model("claude-opus-5")
+    response = _FakeResponse(usage, cache=cache)
+    model.set_usage(response)
+    assert response.recorded == (10, 20, expected_details)
+    # usage is popped off the response JSON so it is not logged twice
+    assert "usage" not in response.response_json
 
 
 def test_fable_5_1_registered():
