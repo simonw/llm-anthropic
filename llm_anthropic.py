@@ -21,6 +21,26 @@ DEFAULT_TEMPERATURE = 1.0
 MCP_BETA = "mcp-client-2025-11-20"
 
 
+class ClaudeRefusal(llm.ModelError):
+    """Raised when the API returns stop_reason "refusal".
+
+    Claude 4.7 and later models run safety classifiers that can decline a
+    request with an HTTP 200 and an empty (or partial) response. The
+    ``category`` and ``explanation`` come from the response's stop_details.
+    """
+
+    def __init__(self, stop_details):
+        self.stop_details = stop_details or {}
+        self.category = self.stop_details.get("category")
+        self.explanation = self.stop_details.get("explanation")
+        message = "Claude refused this request"
+        if self.category:
+            message += f" ({self.category})"
+        if self.explanation:
+            message += f": {self.explanation}"
+        super().__init__(message)
+
+
 class ThinkingEffort(str, enum.Enum):
     LOW = "low"
     MEDIUM = "medium"
@@ -1429,6 +1449,19 @@ class _Shared:
             details = usage
         response.set_usage(input=input_tokens, output=output_tokens, details=details)
 
+    def raise_if_refused(self, response):
+        """Raise ClaudeRefusal if the response stopped with a refusal.
+
+        The API signals a safety classifier block with a normal HTTP 200,
+        ``stop_reason: "refusal"`` and an empty content array - or partial
+        content if the classifier fired mid-stream. Called after the
+        response JSON and usage have been recorded so they are available
+        on the response object even though the exception propagates.
+        """
+        message = response.response_json or {}
+        if message.get("stop_reason") == "refusal":
+            raise ClaudeRefusal(message.get("stop_details"))
+
     def add_tool_usage(self, response, last_message) -> bool:
         tool_uses = [
             item for item in last_message["content"] if item["type"] == "tool_use"
@@ -1582,6 +1615,7 @@ class ClaudeMessages(_Shared, llm.KeyModel):
                 # Avoid "can have dragons.Now that I " bug
                 yield StreamEvent(type="text", chunk=" ")
         self.set_usage(response)
+        self.raise_if_refused(response)
 
 
 class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
@@ -1716,3 +1750,4 @@ class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
                 # Avoid "can have dragons.Now that I " bug
                 yield StreamEvent(type="text", chunk=" ")
         self.set_usage(response)
+        self.raise_if_refused(response)

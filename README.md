@@ -247,6 +247,21 @@ Claude 4.7 and later models leave the thinking trace out of the response by defa
 
 The `thinking_budget`, `thinking_display` and `thinking_adaptive` options were removed in llm-anthropic 0.26 - install `llm-anthropic==0.25` if you need them for older models.
 
+## Refusals
+
+Claude Opus 5 and the Fable models run [safety classifiers](https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback) that can decline a request. The API reports this as a successful response with `stop_reason: "refusal"` and empty content, so this plugin raises a `llm_anthropic.ClaudeRefusal` exception (a subclass of `llm.ModelError`) instead of returning an empty string. The exception message includes the category and explanation from the API, and the exception object exposes them as `.category` and `.explanation`:
+
+```python
+import llm
+from llm_anthropic import ClaudeRefusal
+
+model = llm.get_model("claude-fable-5.1")
+try:
+    print(model.prompt("...").text())
+except ClaudeRefusal as ex:
+    print(ex.category, ex.explanation)
+```
+
 ## Model options
 
 The following options can be passed using `-o name value` on the CLI or as `keyword=value` arguments to the Python `model.prompt()` method:
