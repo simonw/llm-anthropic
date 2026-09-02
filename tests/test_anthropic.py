@@ -1705,6 +1705,52 @@ def test_thinking_false_sends_disabled():
     assert kwargs["thinking"] == {"type": "disabled"}
 
 
+def test_fable_5_1_registered():
+    model = llm.get_model("claude-fable-5.1")
+    assert model.model_id == "anthropic/claude-fable-5-1"
+    assert model.claude_model_id == "claude-fable-5-1"
+    assert "application/pdf" in model.attachment_types
+    assert model.supports_thinking
+    assert model.supports_thinking_effort
+    assert model.supports_adaptive_thinking
+    assert model.supports_web_search
+    assert model.supports_code_execution
+    assert model.supports_system_messages
+    assert model.thinks_by_default
+    assert model.always_thinks
+    assert model.use_structured_outputs
+    assert model.default_max_tokens == 128000
+    async_model = llm.get_async_model("claude-fable-5.1")
+    assert async_model.model_id == "anthropic/claude-fable-5-1"
+    assert async_model.always_thinks
+
+
+def test_fable_5_1_kwargs():
+    model = llm.get_model("claude-fable-5.1")
+    prompt = llm.Prompt("Hi", model, options=model.Options(thinking_effort="xhigh"))
+    kwargs = model.build_kwargs(prompt, None)
+    assert kwargs["model"] == "claude-fable-5-1"
+    assert kwargs["max_tokens"] == 128000
+    assert kwargs["thinking"] == {"type": "adaptive", "display": "summarized"}
+    assert kwargs["output_config"]["effort"] == "xhigh"
+    assert "betas" not in kwargs
+    # Fable 5.1 rejects forced tool_choice, so schemas must use structured
+    # outputs rather than the output_structured_data tool workaround
+    schema_prompt = llm.Prompt(
+        "Hi", model, options=model.Options(), schema={"type": "object"}
+    )
+    schema_kwargs = model.build_kwargs(schema_prompt, None)
+    assert schema_kwargs["output_config"]["format"]["type"] == "json_schema"
+    assert "tool_choice" not in schema_kwargs
+
+
+def test_thinking_false_fable_5_1_raises():
+    model = llm.get_model("claude-fable-5.1")
+    prompt = llm.Prompt("Hi", model, options=model.Options(thinking=False))
+    with pytest.raises(ValueError, match="cannot be disabled"):
+        model.build_kwargs(prompt, None)
+
+
 def test_thinking_false_fable_raises():
     model = llm.get_model("claude-fable-5")
     prompt = llm.Prompt("Hi", model, options=model.Options(thinking=False))
