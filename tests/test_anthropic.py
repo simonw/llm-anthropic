@@ -447,6 +447,10 @@ def test_fixed_version_tool_chain_with_thinking_display_regression():
         if isinstance(part, ReasoningPart)
     ]
     assert reasoning_parts[0].provider_metadata["anthropic"]["signature"]
+    assert first_response.output_tokens == 92
+    assert first_response.token_details["output_tokens_details"] == {
+        "thinking_tokens": 53
+    }
 
     second_response = chain_response._responses[1]
     second_request_messages = model.build_messages(
