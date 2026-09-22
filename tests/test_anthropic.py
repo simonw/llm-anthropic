@@ -2326,3 +2326,71 @@ def test_build_messages_plain_reasoning_not_invented_as_redacted():
         }
     )
     assert msgs[1]["content"] == [{"type": "thinking", "thinking": "thoughts"}]
+
+
+def test_anthropic_models_command(monkeypatch):
+    from click.testing import CliRunner
+    from llm.cli import cli
+
+    pages = [
+        {
+            "data": [
+                {
+                    "type": "model",
+                    "id": "claude-opus-5-5",
+                    "display_name": "Claude Opus 5.5",
+                    "created_at": "2026-09-21T16:24:00Z",
+                }
+            ],
+            "has_more": True,
+            "first_id": "claude-opus-5-5",
+            "last_id": "claude-opus-5-5",
+        },
+        {
+            "data": [
+                {
+                    "type": "model",
+                    "id": "claude-haiku-4-5-20251001",
+                    "display_name": "Claude Haiku 4.5",
+                    "created_at": "2025-10-15T00:00:00Z",
+                }
+            ],
+            "has_more": False,
+            "first_id": "claude-haiku-4-5-20251001",
+            "last_id": "claude-haiku-4-5-20251001",
+        },
+    ]
+    calls = []
+
+    class FakeAnthropic:
+        def __init__(self, api_key):
+            assert api_key == "sk-test"
+            self.models = self
+            self.with_raw_response = self
+
+        def list(self, **kwargs):
+            calls.append(kwargs)
+            self.http_response = self
+            return self
+
+        def json(self):
+            return pages[len(calls) - 1]
+
+    monkeypatch.setattr(llm_anthropic, "Anthropic", FakeAnthropic)
+    runner = CliRunner()
+    result = runner.invoke(cli, ["anthropic", "models", "--key", "sk-test"])
+    assert result.exit_code == 0, result.output
+    assert result.output == (
+        "claude-opus-5-5: Claude Opus 5.5 (created 2026-09-21)\n"
+        "claude-haiku-4-5-20251001: Claude Haiku 4.5 (created 2025-10-15)\n"
+    )
+    assert calls == [{"limit": 1000}, {"limit": 1000, "after_id": "claude-opus-5-5"}]
+    calls.clear()
+    result = runner.invoke(cli, ["anthropic", "models", "--key", "sk-test", "--json"])
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert [m["id"] for m in data["data"]] == [
+        "claude-opus-5-5",
+        "claude-haiku-4-5-20251001",
+    ]
+    assert data["has_more"] is False

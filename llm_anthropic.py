@@ -1,5 +1,6 @@
 from anthropic import Anthropic, AsyncAnthropic, transform_schema
 import enum
+import click
 import llm
 from llm.models import _partition_tools
 from llm.parts import (
@@ -47,6 +48,59 @@ class ThinkingEffort(str, enum.Enum):
     HIGH = "high"
     XHIGH = "xhigh"
     MAX = "max"
+
+
+@llm.hookimpl
+def register_commands(cli):
+    @cli.group()
+    def anthropic():
+        "Commands relating to the llm-anthropic plugin"
+
+    @anthropic.command()
+    @click.option("json_", "--json", is_flag=True, help="Output raw JSON")
+    @click.option("--key", help="Anthropic API key to use")
+    def models(json_, key):
+        "List models available from the Anthropic API"
+        api_key = llm.get_key(input=key, alias="anthropic", env="ANTHROPIC_API_KEY")
+        if not api_key:
+            raise click.ClickException(
+                "No key found - set one with 'llm keys set anthropic' "
+                "or the ANTHROPIC_API_KEY environment variable"
+            )
+        client = Anthropic(api_key=api_key)
+        data = fetch_models(client)
+        if json_:
+            click.echo(json.dumps(data, indent=2))
+            return
+        for model in data["data"]:
+            click.echo(
+                "{}: {} (created {})".format(
+                    model["id"],
+                    model.get("display_name") or "",
+                    (model.get("created_at") or "")[:10],
+                )
+            )
+
+
+def fetch_models(client):
+    "Fetch all pages from /v1/models, returning the combined JSON"
+    models = []
+    after_id = None
+    while True:
+        kwargs = {"limit": 1000}
+        if after_id:
+            kwargs["after_id"] = after_id
+        page = client.models.with_raw_response.list(**kwargs).http_response.json()
+        models.extend(page["data"])
+        if not page.get("has_more"):
+            break
+        after_id = page["last_id"]
+    return {
+        "data": models,
+        "has_more": False,
+        "first_id": models[0]["id"] if models else None,
+        "last_id": models[-1]["id"] if models else None,
+    }
 
 
 @llm.hookimpl
