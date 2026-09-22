@@ -9,7 +9,7 @@ requires-python = ">=3.10"
 classifiers = []
 dependencies = [
     "llm>=0.33",
-    "anthropic>=1,<2",
+    "anthropic>=1.5,<2",
 ]
 
 [project.urls]

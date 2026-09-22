@@ -46,7 +46,6 @@ def test_prompt():
             "content": [
                 {
                     "citations": None,
-                    "parsed_output": None,
                     "text": "- Captain\n- Scoop",
                     "type": "text",
                 }
@@ -80,7 +79,6 @@ async def test_async_prompt():
             "content": [
                 {
                     "citations": None,
-                    "parsed_output": None,
                     "text": "- Captain\n- Scoop",
                     "type": "text",
                 }
@@ -211,7 +209,6 @@ def test_image_prompt():
             "content": [
                 {
                     "citations": None,
-                    "parsed_output": None,
                     "text": "Red square, green square.",
                     "type": "text",
                 }
