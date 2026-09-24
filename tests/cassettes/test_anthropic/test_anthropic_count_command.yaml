@@ -1,0 +1,237 @@
+interactions:
+- request:
+    body: '{"messages":[{"role":"user","content":[{"type":"text","text":"Hello there"}]}],"model":"claude-opus-5","thinking":{"type":"adaptive","display":"summarized"}}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      anthropic-version:
+      - '2023-06-01'
+      connection:
+      - keep-alive
+      content-length:
+      - '157'
+      content-type:
+      - application/json
+      host:
+      - api.anthropic.com
+      user-agent:
+      - Anthropic/Python 1.8.0
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.8.0
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.14.3
+      x-stainless-timeout:
+      - NOT_GIVEN
+    method: POST
+    uri: https://api.anthropic.com/v1/messages/count_tokens
+  response:
+    body:
+      string: '{"input_tokens":10}'
+    headers:
+      anthropic-organization-id:
+      - b320df16-c763-4455-b901-3f7d54e9a012
+      anthropic-workspace-id:
+      - wrkspc_01G8WzfhPhykpX2gDemiDhAg
+      cf-cache-status:
+      - DYNAMIC
+      cf-ray:
+      - a3fb03188afd888e-SJC
+      connection:
+      - keep-alive
+      content-length:
+      - '19'
+      content-security-policy:
+      - default-src 'none'; frame-ancestors 'none'
+      content-type:
+      - application/json
+      date:
+      - Wed, 23 Sep 2026 16:44:05 GMT
+      request-id:
+      - req_011CfLhynNvPHsb9srviWH5i
+      server:
+      - cloudflare
+      server-timing:
+      - x-originResponse;dur=33
+      transfer-encoding:
+      - chunked
+      vary:
+      - Accept-Encoding
+      x-robots-tag:
+      - none
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages":[{"role":"user","content":[{"type":"text","text":"Hello there"}]}],"model":"claude-opus-5","output_config":{"format":{"type":"json_schema","schema":{"type":"object","properties":{"name":{"type":"string"},"age":{"type":"integer"}},"additionalProperties":false,"required":["name","age"]}}},"system":"You
+      are a pirate","thinking":{"type":"adaptive","display":"summarized"}}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      anthropic-version:
+      - '2023-06-01'
+      connection:
+      - keep-alive
+      content-length:
+      - '382'
+      content-type:
+      - application/json
+      host:
+      - api.anthropic.com
+      user-agent:
+      - Anthropic/Python 1.8.0
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.8.0
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.14.3
+      x-stainless-timeout:
+      - NOT_GIVEN
+    method: POST
+    uri: https://api.anthropic.com/v1/messages/count_tokens
+  response:
+    body:
+      string: '{"input_tokens":225}'
+    headers:
+      anthropic-organization-id:
+      - b320df16-c763-4455-b901-3f7d54e9a012
+      anthropic-workspace-id:
+      - wrkspc_01G8WzfhPhykpX2gDemiDhAg
+      cf-cache-status:
+      - DYNAMIC
+      cf-ray:
+      - a3fb031d1f2a8e1f-SJC
+      connection:
+      - keep-alive
+      content-length:
+      - '20'
+      content-security-policy:
+      - default-src 'none'; frame-ancestors 'none'
+      content-type:
+      - application/json
+      date:
+      - Wed, 23 Sep 2026 16:44:06 GMT
+      request-id:
+      - req_011CfLhyqVSzLu3hv3hbsm3k
+      server:
+      - cloudflare
+      server-timing:
+      - x-originResponse;dur=55
+      transfer-encoding:
+      - chunked
+      vary:
+      - Accept-Encoding
+      x-robots-tag:
+      - none
+    status:
+      code: 200
+      message: OK
+- request:
+    body: '{"messages":[{"role":"user","content":[{"type":"text","text":"Hello there"}]}],"model":"claude-opus-5","thinking":{"type":"adaptive","display":"summarized"}}'
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, zstd
+      anthropic-version:
+      - '2023-06-01'
+      connection:
+      - keep-alive
+      content-length:
+      - '157'
+      content-type:
+      - application/json
+      host:
+      - api.anthropic.com
+      user-agent:
+      - Anthropic/Python 1.8.0
+      x-stainless-arch:
+      - arm64
+      x-stainless-async:
+      - 'false'
+      x-stainless-lang:
+      - python
+      x-stainless-os:
+      - MacOS
+      x-stainless-package-version:
+      - 1.8.0
+      x-stainless-read-timeout:
+      - '600'
+      x-stainless-retry-count:
+      - '0'
+      x-stainless-runtime:
+      - CPython
+      x-stainless-runtime-version:
+      - 3.14.3
+      x-stainless-timeout:
+      - NOT_GIVEN
+    method: POST
+    uri: https://api.anthropic.com/v1/messages/count_tokens
+  response:
+    body:
+      string: '{"input_tokens":10}'
+    headers:
+      anthropic-organization-id:
+      - b320df16-c763-4455-b901-3f7d54e9a012
+      anthropic-workspace-id:
+      - wrkspc_01G8WzfhPhykpX2gDemiDhAg
+      cf-cache-status:
+      - DYNAMIC
+      cf-ray:
+      - a3fb03234ec97ad9-SJC
+      connection:
+      - keep-alive
+      content-length:
+      - '19'
+      content-security-policy:
+      - default-src 'none'; frame-ancestors 'none'
+      content-type:
+      - application/json
+      date:
+      - Wed, 23 Sep 2026 16:44:07 GMT
+      request-id:
+      - req_011CfLhyukRkmrAfpbKbTuTQ
+      server:
+      - cloudflare
+      server-timing:
+      - x-originResponse;dur=32
+      transfer-encoding:
+      - chunked
+      vary:
+      - Accept-Encoding
+      x-robots-tag:
+      - none
+    status:
+      code: 200
+      message: OK
+version: 1

@@ -15,11 +15,37 @@ from llm.parts import (
 import json
 from typing import Any, Dict, Optional, List
 from urllib.parse import urlsplit
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, ValidationError, field_validator, model_validator
+from pydantic.json_schema import SkipJsonSchema
 
 DEFAULT_THINKING_TOKENS = 1024
 DEFAULT_TEMPERATURE = 1.0
 MCP_BETA = "mcp-client-2025-11-20"
+# Request parameters accepted by the count_tokens endpoint
+COUNT_TOKENS_PARAMS = {
+    "model",
+    "messages",
+    "system",
+    "tools",
+    "tool_choice",
+    "thinking",
+    "output_config",
+    "betas",
+    "mcp_servers",
+    "context_management",
+    "speed",
+}
+
+
+class TokenCount(Exception):
+    """Raised by execute() when the count_tokens option is set, so the
+    llm prompt command never reaches the point where it logs a response"""
+
+    def __init__(self, count):
+        self.count = count
+        super().__init__(
+            f"Token count: {count} (use 'llm anthropic count' to count tokens)"
+        )
 
 
 class ClaudeRefusal(llm.ModelError):
@@ -80,6 +106,62 @@ def register_commands(cli):
                     (model.get("created_at") or "")[:10],
                 )
             )
+
+    prompt_command = cli.commands["prompt"]
+    # llm prompt options that make no sense when counting tokens
+    skip = {
+        "save",
+        "log",
+        "no_log",
+        "usage",
+        "extract",
+        "extract_last",
+        "json_output",
+        "async_",
+        "no_stream",
+        "hide_reasoning",
+        "show_model_options",
+        "tools_debug",
+        "tools_approve",
+        "chain_limit",
+    }
+
+    @click.pass_context
+    def count(ctx, **kwargs):
+        kwargs["options"] = (("count_tokens", "1"),) + tuple(kwargs["options"])
+        try:
+            ctx.invoke(prompt_command, no_log=True, **kwargs)
+        except (TokenCount, click.ClickException) as ex:
+            # llm prompt wraps exceptions in ClickException, unless
+            # LLM_RAISE_ERRORS is set or it is running under pytest
+            token_count = ex if isinstance(ex, TokenCount) else ex.__context__
+            if not isinstance(token_count, TokenCount):
+                # Options validation rejected count_tokens: not an Anthropic model
+                if isinstance(token_count, ValidationError) and any(
+                    error["loc"] == ("count_tokens",)
+                    and error["type"] == "extra_forbidden"
+                    for error in token_count.errors()
+                ):
+                    raise click.ClickException(
+                        "Token counting only works with Anthropic models"
+                    )
+                raise
+            click.echo(token_count.count)
+
+    anthropic.add_command(
+        click.Command(
+            "count",
+            callback=count,
+            params=[p for p in prompt_command.params if p.name not in skip],
+            help=(
+                "Count tokens for a prompt using the Anthropic token counting API\n\n"
+                "Accepts the same options as 'llm prompt'\n\n"
+                "Example:\n\n"
+                "\b\n"
+                "    llm anthropic count 'Describe this' -m opus -a image.jpg"
+            ),
+        )
+    )
 
 
 def fetch_models(client):
@@ -641,6 +723,10 @@ class ClaudeOptions(llm.Options):
         description="Use fast mode for lower latency responses: https://platform.claude.com/docs/en/build-with-claude/fast-mode",
         default=None,
     )
+
+    # Undocumented, hidden from llm models --options: used by the
+    # "llm anthropic count" command to count tokens instead of prompting
+    count_tokens: SkipJsonSchema[bool | None] = None
 
     @field_validator("stop_sequences")
     def validate_stop_sequences(cls, stop_sequences):
@@ -1520,6 +1606,17 @@ class _Shared:
 
         return kwargs
 
+    def _count_tokens(self, client, prompt, conversation):
+        kwargs = self.build_kwargs(prompt, conversation)
+        count_kwargs = {k: v for k, v in kwargs.items() if k in COUNT_TOKENS_PARAMS}
+        # extra_body carries sampling parameters count_tokens does not accept,
+        # plus thinking when it has been moved there for the 128K output beta
+        if "thinking" in kwargs.get("extra_body", {}):
+            count_kwargs["extra_body"] = {"thinking": kwargs["extra_body"]["thinking"]}
+        if "betas" in count_kwargs:
+            return client.beta.messages.count_tokens(**count_kwargs)
+        return client.messages.count_tokens(**count_kwargs)
+
     def set_usage(self, response):
         usage = response.response_json.pop("usage")
         input_tokens = usage.pop("input_tokens")
@@ -1574,8 +1671,19 @@ class _Shared:
 
 
 class ClaudeMessages(_Shared, llm.KeyModel):
+    def count_tokens(self, prompt=None, *, conversation=None, key=None, **kwargs):
+        """Count the input tokens for a prompt using the Anthropic token
+        counting API. Accepts the same arguments as model.prompt()"""
+        llm_prompt = (conversation or self).prompt(prompt, **kwargs).prompt
+        client = Anthropic(api_key=self.get_key(key), base_url=self.base_url)
+        return self._count_tokens(client, llm_prompt, conversation).input_tokens
+
     def execute(self, prompt, stream, response, conversation, key):
         client = Anthropic(api_key=self.get_key(key), base_url=self.base_url)
+        if prompt.options.count_tokens:
+            raise TokenCount(
+                self._count_tokens(client, prompt, conversation).input_tokens
+            )
         kwargs = self.build_kwargs(prompt, conversation)
         prefill_text = self.prefill_text(prompt)
         if "betas" in kwargs:
@@ -1712,8 +1820,21 @@ class ClaudeMessages(_Shared, llm.KeyModel):
 
 
 class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
+    async def count_tokens(
+        self, prompt=None, *, conversation=None, key=None, **kwargs
+    ):
+        """Count the input tokens for a prompt using the Anthropic token
+        counting API. Accepts the same arguments as model.prompt()"""
+        llm_prompt = (conversation or self).prompt(prompt, **kwargs).prompt
+        client = AsyncAnthropic(api_key=self.get_key(key), base_url=self.base_url)
+        count = await self._count_tokens(client, llm_prompt, conversation)
+        return count.input_tokens
+
     async def execute(self, prompt, stream, response, conversation, key):
         client = AsyncAnthropic(api_key=self.get_key(key), base_url=self.base_url)
+        if prompt.options.count_tokens:
+            count = await self._count_tokens(client, prompt, conversation)
+            raise TokenCount(count.input_tokens)
         kwargs = self.build_kwargs(prompt, conversation)
         if "betas" in kwargs:
             messages_client = client.beta.messages
