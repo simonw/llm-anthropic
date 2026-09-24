@@ -358,7 +358,7 @@ Claude 5 models no longer accept sampling parameters - setting `temperature`, `t
 The `prefill` option can be used to set the first part of the response. To increase the chance of returning JSON, set that to `{`:
 
 ```bash
-llm -m claude-sonnet-5 'Fun data about pelicans' \
+llm -m claude-haiku-4.5 'Fun data about pelicans as JSON' \
   -o prefill '{'
 ```
 If you do not want the prefill token to be echoed in the response, set `hide_prefill` to `true`:
@@ -374,23 +374,13 @@ This example sets `` ``` `` as the stop sequence, so the response will be a Pyth
 To pass a single stop sequence, send a string:
 ```bash
 llm -m claude-sonnet-5 'Fun facts about pelicans' \
-  -o stop-sequences "beak"
+  -o stop_sequences "beak"
 ```
 For multiple stop sequences, pass a JSON array:
 
 ```bash
 llm -m claude-sonnet-5 'Fun facts about pelicans' \
-  -o stop-sequences '["beak", "feathers"]'
-```
-
-When using the Python API, pass a string or an array of strings:
-
-```python
-response = llm.query(
-    model="claude-sonnet-5",
-    query="Fun facts about pelicans",
-    stop_sequences=["beak", "feathers"],
-)
+  -o stop_sequences '["beak", "feathers"]'
 ```
 
 ## Development
