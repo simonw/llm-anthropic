@@ -1019,8 +1019,8 @@ class CodeExecution(llm.ServerSideTool):
             kwargs["container"] = self.container
 
 
-def source_for_attachment(attachment):
-    if attachment.url:
+def source_for_attachment(attachment, inline_urls=False):
+    if attachment.url and not inline_urls:
         return {
             "type": "url",
             "url": attachment.url,
@@ -1203,7 +1203,7 @@ class _Shared:
     # or role="tool") are merged because Anthropic requires alternating
     # user/assistant turns.
 
-    def _part_to_block(self, part) -> Optional[Dict[str, Any]]:
+    def _part_to_block(self, part, inline_urls=False) -> Optional[Dict[str, Any]]:
         """Translate one llm Part into an Anthropic content block."""
         pm = getattr(part, "provider_metadata", None) or {}
         anthropic_pm = pm.get("anthropic", {}) if isinstance(pm, dict) else {}
@@ -1285,14 +1285,16 @@ class _Shared:
             )
             return {
                 "type": attachment_type,
-                "source": source_for_attachment(attachment),
+                "source": source_for_attachment(attachment, inline_urls),
             }
         return None
 
-    def _message_to_blocks(self, message: Message) -> List[Dict[str, Any]]:
+    def _message_to_blocks(
+        self, message: Message, inline_urls=False
+    ) -> List[Dict[str, Any]]:
         blocks: List[Dict[str, Any]] = []
         for part in message.parts:
-            block = self._part_to_block(part)
+            block = self._part_to_block(part, inline_urls)
             if block is not None:
                 blocks.append(block)
         if message.role == "assistant":
@@ -1312,11 +1314,13 @@ class _Shared:
             blocks = filtered_blocks
         return blocks
 
-    def _append_message(self, out: List[Dict[str, Any]], message: Message) -> None:
+    def _append_message(
+        self, out: List[Dict[str, Any]], message: Message, inline_urls=False
+    ) -> None:
         """Append an Anthropic-shaped message, merging with the previous one
         if both would be user-side turns (tool_result + text in the same
         user message is the required shape for tool follow-ups)."""
-        blocks = self._message_to_blocks(message)
+        blocks = self._message_to_blocks(message, inline_urls)
         if not blocks:
             return
         # Anthropic: tool messages from llm become user messages with
@@ -1377,7 +1381,7 @@ class _Shared:
         if assistant_content:
             out.append({"role": "assistant", "content": assistant_content})
 
-    def build_messages(self, prompt, conversation) -> list[dict]:
+    def build_messages(self, prompt, conversation, inline_urls=False) -> list[dict]:
         messages: List[Dict[str, Any]] = []
 
         # Current turn — iterate prompt.messages (auto-synthesized from
@@ -1389,7 +1393,7 @@ class _Shared:
             if message.role == "system":
                 self._append_system_message(messages, message, index == 0)
             else:
-                self._append_message(messages, message)
+                self._append_message(messages, message, inline_urls)
 
         # The API requires an inline system entry to immediately follow a
         # user turn (and precede an assistant turn or end the array), but
@@ -1439,15 +1443,13 @@ class _Shared:
             return prompt.system
         if prompt.messages and prompt.messages[0].role == "system":
             texts = [
-                p.text
-                for p in prompt.messages[0].parts
-                if isinstance(p, TextPart)
+                p.text for p in prompt.messages[0].parts if isinstance(p, TextPart)
             ]
             if texts:
                 return "\n\n".join(texts)
         return None
 
-    def build_kwargs(self, prompt, conversation):
+    def build_kwargs(self, prompt, conversation, inline_urls=False):
         if prompt.schema and prompt.tools:
             raise ValueError(
                 "llm-anthropic does not yet support using both schema and tools in the same prompt"
@@ -1455,7 +1457,7 @@ class _Shared:
 
         kwargs = {
             "model": self.claude_model_id,
-            "messages": self.build_messages(prompt, conversation),
+            "messages": self.build_messages(prompt, conversation, inline_urls),
         }
         if prompt.options.user_id:
             kwargs["metadata"] = {"user_id": prompt.options.user_id}
@@ -1607,7 +1609,8 @@ class _Shared:
         return kwargs
 
     def _count_tokens(self, client, prompt, conversation):
-        kwargs = self.build_kwargs(prompt, conversation)
+        # count_tokens rejects URL sources that messages.create accepts
+        kwargs = self.build_kwargs(prompt, conversation, inline_urls=True)
         count_kwargs = {k: v for k, v in kwargs.items() if k in COUNT_TOKENS_PARAMS}
         # extra_body carries sampling parameters count_tokens does not accept,
         # plus thinking when it has been moved there for the 128K output beta
@@ -1820,9 +1823,7 @@ class ClaudeMessages(_Shared, llm.KeyModel):
 
 
 class AsyncClaudeMessages(_Shared, llm.AsyncKeyModel):
-    async def count_tokens(
-        self, prompt=None, *, conversation=None, key=None, **kwargs
-    ):
+    async def count_tokens(self, prompt=None, *, conversation=None, key=None, **kwargs):
         """Count the input tokens for a prompt using the Anthropic token
         counting API. Accepts the same arguments as model.prompt()"""
         llm_prompt = (conversation or self).prompt(prompt, **kwargs).prompt

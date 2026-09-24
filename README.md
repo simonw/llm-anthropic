@@ -230,7 +230,9 @@ model = llm.get_model("claude-opus-5")
 count = model.count_tokens(
     "Describe this image",
     system="Be concise",
-    attachments=[llm.Attachment(path="pelican.jpg")],
+    attachments=[
+        llm.Attachment(url="https://static.simonwillison.net/static/2024/pelicans.jpg")
+    ],
     thinking_effort="high",
 )
 ```

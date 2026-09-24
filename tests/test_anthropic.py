@@ -1,3 +1,4 @@
+import base64
 import json
 import llm
 import llm_anthropic
@@ -550,9 +551,7 @@ def test_haiku_4_5_uses_structured_outputs():
     assert model.use_structured_outputs
     async_model = llm.get_async_model("claude-haiku-4.5")
     assert async_model.use_structured_outputs
-    prompt = llm.Prompt(
-        "Hi", model, options=model.Options(), schema={"type": "object"}
-    )
+    prompt = llm.Prompt("Hi", model, options=model.Options(), schema={"type": "object"})
     kwargs = model.build_kwargs(prompt, None)
     assert kwargs["output_config"]["format"]["type"] == "json_schema"
     assert "tool_choice" not in kwargs
@@ -1804,14 +1803,22 @@ FULL_USAGE = {
         (
             FULL_USAGE,
             True,
-            {k: v for k, v in FULL_USAGE.items() if k not in ("input_tokens", "output_tokens")},
+            {
+                k: v
+                for k, v in FULL_USAGE.items()
+                if k not in ("input_tokens", "output_tokens")
+            },
         ),
         # Server-side tool use: keep the whole usage dict
         (
             {**FULL_USAGE, "server_tool_use": {"web_search_requests": 2}},
             False,
             {
-                **{k: v for k, v in FULL_USAGE.items() if k not in ("input_tokens", "output_tokens")},
+                **{
+                    k: v
+                    for k, v in FULL_USAGE.items()
+                    if k not in ("input_tokens", "output_tokens")
+                },
                 "server_tool_use": {"web_search_requests": 2},
             },
         ),
@@ -2457,6 +2464,49 @@ def test_count_tokens_request_kwargs():
     assert name == "beta"
     assert kwargs["speed"] == "fast"
     assert kwargs["betas"] == ["fast-mode-2026-02-01"]
+
+
+def test_count_tokens_inlines_url_attachments(monkeypatch):
+    # The count_tokens endpoint rejects URL image sources, so URL
+    # attachments are downloaded and sent as base64 instead
+    model = llm.get_model("claude-opus-4.8")
+    calls = []
+
+    class FakeClient:
+        class messages:
+            @staticmethod
+            def count_tokens(**kwargs):
+                calls.append(kwargs)
+
+    fetched = []
+
+    def fake_content_bytes(self):
+        fetched.append(self.url)
+        return TINY_PNG
+
+    monkeypatch.setattr(llm.Attachment, "content_bytes", fake_content_bytes)
+    url = "https://example.com/pelican.png"
+    prompt = llm.Prompt(
+        "Describe",
+        model,
+        attachments=[llm.Attachment(type="image/png", url=url)],
+        options=model.Options(),
+    )
+    model._count_tokens(FakeClient, prompt, None)
+    assert fetched == [url]
+    assert calls[-1]["messages"][0]["content"][1] == {
+        "type": "image",
+        "source": {
+            "type": "base64",
+            "media_type": "image/png",
+            "data": base64.b64encode(TINY_PNG).decode("utf-8"),
+        },
+    }
+    # The request sent to messages.create still uses the URL
+    assert model.build_kwargs(prompt, None)["messages"][0]["content"][1] == {
+        "type": "image",
+        "source": {"type": "url", "url": url},
+    }
 
 
 def test_count_tokens_option_hidden():
