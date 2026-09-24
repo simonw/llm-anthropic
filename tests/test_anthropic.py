@@ -1,3 +1,4 @@
+import base64
 import json
 import llm
 import llm_anthropic
@@ -550,9 +551,7 @@ def test_haiku_4_5_uses_structured_outputs():
     assert model.use_structured_outputs
     async_model = llm.get_async_model("claude-haiku-4.5")
     assert async_model.use_structured_outputs
-    prompt = llm.Prompt(
-        "Hi", model, options=model.Options(), schema={"type": "object"}
-    )
+    prompt = llm.Prompt("Hi", model, options=model.Options(), schema={"type": "object"})
     kwargs = model.build_kwargs(prompt, None)
     assert kwargs["output_config"]["format"]["type"] == "json_schema"
     assert "tool_choice" not in kwargs
@@ -1804,14 +1803,22 @@ FULL_USAGE = {
         (
             FULL_USAGE,
             True,
-            {k: v for k, v in FULL_USAGE.items() if k not in ("input_tokens", "output_tokens")},
+            {
+                k: v
+                for k, v in FULL_USAGE.items()
+                if k not in ("input_tokens", "output_tokens")
+            },
         ),
         # Server-side tool use: keep the whole usage dict
         (
             {**FULL_USAGE, "server_tool_use": {"web_search_requests": 2}},
             False,
             {
-                **{k: v for k, v in FULL_USAGE.items() if k not in ("input_tokens", "output_tokens")},
+                **{
+                    k: v
+                    for k, v in FULL_USAGE.items()
+                    if k not in ("input_tokens", "output_tokens")
+                },
                 "server_tool_use": {"web_search_requests": 2},
             },
         ),
@@ -2394,3 +2401,183 @@ def test_anthropic_models_command(monkeypatch):
         "claude-haiku-4-5-20251001",
     ]
     assert data["has_more"] is False
+
+
+@pytest.mark.vcr
+def test_count_tokens():
+    model = llm.get_model("claude-opus-5")
+    model.key = model.key or ANTHROPIC_API_KEY
+    assert model.count_tokens("Hello there") == snapshot(10)
+    assert model.count_tokens(
+        "Hello there", system="You are a pirate", thinking_effort="high"
+    ) == snapshot(17)
+
+
+@pytest.mark.vcr
+@pytest.mark.asyncio
+async def test_async_count_tokens():
+    model = llm.get_async_model("claude-opus-5")
+    model.key = model.key or ANTHROPIC_API_KEY
+    assert await model.count_tokens("Hello there", system="You are a pirate") == (
+        snapshot(17)
+    )
+
+
+def test_count_tokens_request_kwargs():
+    model = llm.get_model("claude-opus-4.8")
+    calls = []
+
+    class FakeMessages:
+        def __init__(self, name):
+            self.name = name
+
+        def count_tokens(self, **kwargs):
+            calls.append((self.name, kwargs))
+
+    class FakeClient:
+        messages = FakeMessages("messages")
+
+        class beta:
+            messages = FakeMessages("beta")
+
+    prompt = llm.Prompt(
+        "Hi",
+        model,
+        system="Be brief",
+        options=model.Options(
+            temperature=0.5, stop_sequences=["x"], user_id="u", max_tokens=100
+        ),
+    )
+    model._count_tokens(FakeClient, prompt, None)
+    name, kwargs = calls[-1]
+    assert name == "messages"
+    # Parameters count_tokens does not accept are dropped
+    assert kwargs == {
+        "model": "claude-opus-4-8",
+        "messages": [{"role": "user", "content": [{"type": "text", "text": "Hi"}]}],
+        "system": "Be brief",
+    }
+    # Betas route to client.beta.messages
+    prompt = llm.Prompt("Hi", model, options=model.Options(fast=True))
+    model._count_tokens(FakeClient, prompt, None)
+    name, kwargs = calls[-1]
+    assert name == "beta"
+    assert kwargs["speed"] == "fast"
+    assert kwargs["betas"] == ["fast-mode-2026-02-01"]
+
+
+def test_count_tokens_inlines_url_attachments(monkeypatch):
+    # The count_tokens endpoint rejects URL image sources, so URL
+    # attachments are downloaded and sent as base64 instead
+    model = llm.get_model("claude-opus-4.8")
+    calls = []
+
+    class FakeClient:
+        class messages:
+            @staticmethod
+            def count_tokens(**kwargs):
+                calls.append(kwargs)
+
+    fetched = []
+
+    def fake_content_bytes(self):
+        fetched.append(self.url)
+        return TINY_PNG
+
+    monkeypatch.setattr(llm.Attachment, "content_bytes", fake_content_bytes)
+    url = "https://example.com/pelican.png"
+    prompt = llm.Prompt(
+        "Describe",
+        model,
+        attachments=[llm.Attachment(type="image/png", url=url)],
+        options=model.Options(),
+    )
+    model._count_tokens(FakeClient, prompt, None)
+    assert fetched == [url]
+    assert calls[-1]["messages"][0]["content"][1] == {
+        "type": "image",
+        "source": {
+            "type": "base64",
+            "media_type": "image/png",
+            "data": base64.b64encode(TINY_PNG).decode("utf-8"),
+        },
+    }
+    # The request sent to messages.create still uses the URL
+    assert model.build_kwargs(prompt, None)["messages"][0]["content"][1] == {
+        "type": "image",
+        "source": {"type": "url", "url": url},
+    }
+
+
+def test_count_tokens_option_hidden():
+    model = llm.get_model("claude-opus-5")
+    assert "count_tokens" not in model.Options.model_json_schema()["properties"]
+
+
+@pytest.mark.vcr
+def test_anthropic_count_command(tmp_path, monkeypatch):
+    import sqlite_utils
+    from click.testing import CliRunner
+    from llm.cli import cli
+
+    monkeypatch.setenv("LLM_USER_PATH", str(tmp_path))
+    monkeypatch.setenv("ANTHROPIC_API_KEY", ANTHROPIC_API_KEY)
+    runner = CliRunner()
+    result = runner.invoke(
+        cli,
+        ["anthropic", "count", "Hello there", "-m", "claude-opus-5"],
+        catch_exceptions=False,
+    )
+    assert result.exit_code == 0, result.output
+    assert result.output == snapshot("10\n")
+    result = runner.invoke(
+        cli,
+        [
+            "anthropic",
+            "count",
+            "Hello there",
+            "-m",
+            "claude-opus-5",
+            "-s",
+            "You are a pirate",
+            "--schema",
+            "name, age int",
+        ],
+        catch_exceptions=False,
+    )
+    assert result.exit_code == 0, result.output
+    assert result.output == snapshot("225\n")
+    # Using the hidden option directly with llm prompt errors instead of
+    # returning a response that would be logged
+    result = runner.invoke(
+        cli, ["-m", "claude-opus-5", "-o", "count_tokens", "1", "Hello there"]
+    )
+    assert result.exit_code == 1
+    assert "Token count: 10" in result.output
+    # Nothing should have been logged
+    db = sqlite_utils.Database(str(tmp_path / "logs.db"))
+    assert db["turns"].count == 0
+
+
+def test_anthropic_count_command_non_anthropic_model(tmp_path, monkeypatch):
+    from click.testing import CliRunner
+    from llm.cli import cli
+
+    monkeypatch.setenv("LLM_USER_PATH", str(tmp_path))
+    result = CliRunner().invoke(
+        cli, ["anthropic", "count", "Hello", "-m", "gpt-4o-mini"]
+    )
+    assert result.exit_code == 1
+    assert "Token counting only works with Anthropic models" in result.output
+
+
+def test_anthropic_count_command_unknown_model(tmp_path, monkeypatch):
+    from click.testing import CliRunner
+    from llm.cli import cli
+
+    monkeypatch.setenv("LLM_USER_PATH", str(tmp_path))
+    result = CliRunner().invoke(
+        cli, ["anthropic", "count", "hi", "-m", "claude-opus-3"]
+    )
+    assert result.exit_code == 1
+    assert result.output == "Error: 'Unknown model: claude-opus-3'\n"
