@@ -1295,8 +1295,13 @@ class _Shared:
         blocks: List[Dict[str, Any]] = []
         for part in message.parts:
             block = self._part_to_block(part, inline_urls)
-            if block is not None:
-                blocks.append(block)
+            if block is None:
+                continue
+            if block.get("type") == "text" and not block.get("text"):
+                # Anthropic rejects empty text blocks, e.g. the empty
+                # assistant turn left behind by a refusal
+                continue
+            blocks.append(block)
         if message.role == "assistant":
             filtered_blocks: List[Dict[str, Any]] = []
             seen_tool_use = False

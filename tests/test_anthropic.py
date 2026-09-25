@@ -802,6 +802,26 @@ def test_build_messages_skips_system_role():
     assert msgs == [{"role": "user", "content": [{"type": "text", "text": "hi"}]}]
 
 
+def test_build_messages_skips_empty_assistant_turn():
+    # https://github.com/simonw/llm-anthropic/issues/37
+    # A refusal leaves an empty assistant turn in the conversation. Sending
+    # it as an empty text block makes every follow-up prompt fail with a 400.
+    from llm import assistant, user
+
+    msgs = _build_messages_for(
+        {"messages": [user("first"), assistant(""), user("second")]}
+    )
+    assert msgs == [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "first"},
+                {"type": "text", "text": "second"},
+            ],
+        }
+    ]
+
+
 def test_build_messages_merges_tool_then_user():
     """A tool-role message followed by a user message must collapse into one
     Anthropic user turn (tool_result + text in the same content array)."""
