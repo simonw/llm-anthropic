@@ -815,6 +815,14 @@ def _validate_domain_filters(allowed_domains, blocked_domains):
             raise ValueError(f"{name} must be a list of non-empty strings")
 
 
+def _validate_response_inclusion(response_inclusion):
+    if response_inclusion is not None and response_inclusion not in (
+        "full",
+        "excluded",
+    ):
+        raise ValueError("response_inclusion must be 'full' or 'excluded'")
+
+
 class WebSearch(llm.ServerSideTool):
     """Search the web using Anthropic's server-side web search tool.
 
@@ -830,10 +838,12 @@ class WebSearch(llm.ServerSideTool):
         allowed_domains: Optional[List[str]] = None,
         blocked_domains: Optional[List[str]] = None,
         user_location: Optional[dict] = None,
+        response_inclusion: Optional[str] = None,
     ):
         super().__init__()
         _validate_max_uses(max_uses)
         _validate_domain_filters(allowed_domains, blocked_domains)
+        _validate_response_inclusion(response_inclusion)
         if user_location is not None:
             if not isinstance(user_location, dict):
                 raise ValueError("user_location must be a dictionary")
@@ -852,9 +862,15 @@ class WebSearch(llm.ServerSideTool):
         self.allowed_domains = allowed_domains
         self.blocked_domains = blocked_domains
         self.user_location = user_location
+        self.response_inclusion = response_inclusion
 
     def tool_spec(self, model):
         modern = getattr(model, "supports_adaptive_thinking", False)
+        if self.response_inclusion is not None and not modern:
+            raise ValueError(
+                f"response_inclusion is not supported by model {model.model_id} - "
+                "it requires a Claude 4.6 or later model"
+            )
         spec = {
             "type": "web_search_20260318" if modern else "web_search_20250305",
             "name": "web_search",
@@ -867,6 +883,8 @@ class WebSearch(llm.ServerSideTool):
             spec["blocked_domains"] = list(self.blocked_domains)
         if self.user_location is not None:
             spec["user_location"] = dict(self.user_location)
+        if self.response_inclusion is not None:
+            spec["response_inclusion"] = self.response_inclusion
         return spec
 
 

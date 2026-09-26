@@ -1381,6 +1381,105 @@ def test_web_search_tool_domain_conflict():
         WebSearch(allowed_domains=["a.com"], blocked_domains=["b.com"])
 
 
+def test_web_search_response_inclusion_kwargs():
+    from llm_anthropic import WebSearch
+
+    model = llm.get_model("claude-sonnet-4.6")
+    for value in ("full", "excluded"):
+        prompt = llm.Prompt(
+            "What is the weather in London?",
+            model,
+            options=model.Options(),
+            tools=[WebSearch(response_inclusion=value)],
+        )
+        kwargs = model.build_kwargs(prompt, None)
+        assert kwargs["tools"] == [
+            {
+                "type": "web_search_20260318",
+                "name": "web_search",
+                "response_inclusion": value,
+            }
+        ]
+
+
+def test_web_search_response_inclusion_unset_is_omitted():
+    from llm_anthropic import WebSearch
+
+    model = llm.get_model("claude-sonnet-4.6")
+    prompt = llm.Prompt(
+        "What is the weather in London?",
+        model,
+        options=model.Options(),
+        tools=[WebSearch(max_uses=1)],
+    )
+    kwargs = model.build_kwargs(prompt, None)
+    assert "response_inclusion" not in kwargs["tools"][0]
+
+
+def test_web_search_response_inclusion_invalid_value():
+    from llm_anthropic import WebSearch
+
+    with pytest.raises(ValueError, match="response_inclusion must be"):
+        WebSearch(response_inclusion="partial")
+
+
+def test_web_search_response_inclusion_requires_newer_model():
+    from llm_anthropic import WebSearch
+
+    model = llm.get_model("claude-opus-4.1")
+    prompt = llm.Prompt(
+        "Search the web",
+        model,
+        options=model.Options(),
+        tools=[WebSearch(response_inclusion="excluded")],
+    )
+    with pytest.raises(ValueError, match="response_inclusion is not supported"):
+        model.build_kwargs(prompt, None)
+    # Unset still works on the older model
+    prompt_unset = llm.Prompt(
+        "Search the web", model, options=model.Options(), tools=[WebSearch()]
+    )
+    kwargs = model.build_kwargs(prompt_unset, None)
+    assert kwargs["tools"] == [{"type": "web_search_20250305", "name": "web_search"}]
+
+
+@pytest.mark.asyncio
+async def test_web_search_response_inclusion_async():
+    from llm_anthropic import WebSearch
+
+    model = llm.get_async_model("claude-sonnet-4.6")
+    prompt = llm.Prompt(
+        "What is the weather in London?",
+        model,
+        options=model.Options(),
+        tools=[WebSearch(response_inclusion="excluded")],
+    )
+    kwargs = model.build_kwargs(prompt, None)
+    assert kwargs["tools"] == [
+        {
+            "type": "web_search_20260318",
+            "name": "web_search",
+            "response_inclusion": "excluded",
+        }
+    ]
+
+
+def test_web_search_response_inclusion_leaves_dynamic_filtering_alone():
+    """response_inclusion must not pin the tool to direct calls only."""
+    from llm_anthropic import WebSearch
+
+    model = llm.get_model("claude-sonnet-4.6")
+    prompt = llm.Prompt(
+        "What is the weather in London?",
+        model,
+        options=model.Options(cache=True),
+        tools=[WebSearch(response_inclusion="excluded")],
+    )
+    kwargs = model.build_kwargs(prompt, None)
+    assert "allowed_callers" not in kwargs["tools"][0]
+    assert kwargs["tools"][0]["response_inclusion"] == "excluded"
+
+
 @pytest.mark.vcr
 def test_web_search_server_side_tool():
     from llm_anthropic import WebSearch

@@ -86,8 +86,9 @@ Available arguments:
 - `max_uses`: maximum number of searches per request
 - `allowed_domains` / `blocked_domains`: lists of domains to allow or block (cannot be combined)
 - `user_location`: dictionary with optional `city`, `region`, `country` and `timezone` keys to localize results
+- `response_inclusion`: set to `"excluded"` to drop nested search result blocks that a completed code execution call has already consumed, reducing output token cost; `"full"` is the default (Claude 4.6 and later models only)
 
-Note that `user_location` affects the *results* of searches from the web search tool, but location information is not made directly available to the model.
+Note that `user_location` affects the *results* of searches from the web search tool, but location information is not made directly available to the model. `response_inclusion` requires `web_search_20260318`, so using it with an older model raises a `ValueError` rather than being silently ignored.
 
 On Claude 4.6 and later models this uses the `web_search_20260318` tool version with dynamic filtering; older models use the basic `web_search_20250305` version.
 
