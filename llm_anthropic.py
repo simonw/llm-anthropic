@@ -1361,7 +1361,12 @@ class _Shared:
 
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
-            return message.model_dump()
+            dumped = message.model_dump()
+        # anthropic>=1.9 adds an opt-in "diagnostics" field that is always
+        # null unless the request asks for it, which this plugin never does
+        if dumped.get("diagnostics") is None:
+            dumped.pop("diagnostics", None)
+        return dumped
 
     # --- messages= support -------------------------------------------------
     #
