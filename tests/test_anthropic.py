@@ -2403,6 +2403,236 @@ def test_anthropic_models_command(monkeypatch):
     assert data["has_more"] is False
 
 
+def _capability_details(adaptive=True, enabled=False, pdf=True, effort=True):
+    "capabilities in the shape returned by the /v1/models API"
+
+    def support(value):
+        return {"supported": value}
+
+    return {
+        "batch": support(True),
+        "citations": support(True),
+        "code_execution": support(True),
+        "context_management": {"supported": True},
+        "effort": {
+            "supported": effort,
+            "low": support(effort),
+            "medium": support(effort),
+            "high": support(effort),
+            "max": support(effort),
+        },
+        "image_input": support(True),
+        "pdf_input": support(pdf),
+        "structured_outputs": support(True),
+        "thinking": {
+            "supported": True,
+            "types": {"adaptive": support(adaptive), "enabled": support(enabled)},
+        },
+    }
+
+
+@pytest.fixture
+def user_path(tmp_path, monkeypatch):
+    monkeypatch.setenv("LLM_USER_PATH", str(tmp_path))
+    return tmp_path
+
+
+def _anthropic_models():
+    return {
+        model_with_aliases.model.claude_model_id: model_with_aliases
+        for model_with_aliases in llm.get_models_with_aliases()
+        if isinstance(model_with_aliases.model, llm_anthropic.ClaudeMessages)
+    }
+
+
+def test_sdk_models_do_not_duplicate_builtin_models(user_path):
+    # The SDK lists both claude-haiku-4-5 and claude-haiku-4-5-20251001,
+    # claude-sonnet-4-5 and claude-sonnet-4-5-20250929 etc
+    builtin = {}
+
+    def register(model, async_model=None, aliases=None):
+        builtin[model.claude_model_id] = tuple(aliases or ())
+
+    llm_anthropic.register_builtin_models(register)
+    builtin_bases = {llm_anthropic._base_model_id(model_id) for model_id in builtin}
+    extra_bases = [
+        llm_anthropic._base_model_id(model_id)
+        for model_id, _, _ in llm_anthropic.extra_models(builtin)
+    ]
+    assert not builtin_bases.intersection(extra_bases)
+    assert len(extra_bases) == len(set(extra_bases))
+    aliases = [
+        alias
+        for model_with_aliases in _anthropic_models().values()
+        for alias in model_with_aliases.aliases
+    ]
+    assert len(aliases) == len(set(aliases))
+
+
+def test_models_from_sdk(user_path, monkeypatch):
+    monkeypatch.setattr(
+        llm_anthropic,
+        "sdk_model_ids",
+        lambda: ["claude-opus-6-1", "claude-haiku-4-5", "claude-opus-5-5"],
+    )
+    models = _anthropic_models()
+    # Same model as the built-in claude-haiku-4-5-20251001
+    assert "claude-haiku-4-5" not in models
+    new = models["claude-opus-6-1"]
+    assert new.model.model_id == "anthropic/claude-opus-6-1"
+    assert new.async_model.model_id == "anthropic/claude-opus-6-1"
+    assert new.aliases == ["claude-opus-6-1", "claude-opus-6.1"]
+    model = llm.get_model("claude-opus-6.1")
+    assert model.model_id == "anthropic/claude-opus-6-1"
+    # Treated like the newest built-in models, with a safe max_tokens
+    assert model.always_thinks
+    assert model.supports_system_messages
+    assert model.default_max_tokens == 64000
+    kwargs = model.build_kwargs(llm.Prompt("Hi", model, options=model.Options()), None)
+    assert kwargs["model"] == "claude-opus-6-1"
+    assert kwargs["thinking"] == {"type": "adaptive", "display": "summarized"}
+    assert kwargs["max_tokens"] == 64000
+    # Built-in models keep their built-in settings
+    assert models["claude-opus-5-5"].model.default_max_tokens == 128000
+
+
+def test_models_from_refresh_cache(user_path, monkeypatch):
+    monkeypatch.setattr(llm_anthropic, "sdk_model_ids", lambda: ["claude-opus-6"])
+    (user_path / "anthropic_models.json").write_text(
+        json.dumps(
+            {
+                "data": [
+                    {
+                        "type": "model",
+                        "id": "claude-opus-6",
+                        "display_name": "Claude Opus 6",
+                        "max_tokens": 256000,
+                        "capabilities": _capability_details(),
+                    },
+                    {
+                        "type": "model",
+                        "id": "claude-haiku-6-20270101",
+                        "display_name": "Claude Haiku 6",
+                        "max_tokens": 32000,
+                        "capabilities": _capability_details(
+                            adaptive=False, enabled=True, pdf=False, effort=False
+                        ),
+                    },
+                    {
+                        "type": "model",
+                        "id": "claude-sonnet-5-5",
+                        "max_tokens": 1000,
+                        "capabilities": _capability_details(pdf=False),
+                    },
+                ]
+            }
+        )
+    )
+    models = _anthropic_models()
+    opus = models["claude-opus-6"].model
+    assert opus.default_max_tokens == 256000
+    assert opus.thinks_by_default and opus.always_thinks
+    assert "thinking_effort" in opus.Options.model_fields
+
+    haiku_with_aliases = models["claude-haiku-6-20270101"]
+    assert haiku_with_aliases.aliases == ["claude-haiku-6-20270101"]
+    haiku = haiku_with_aliases.model
+    assert haiku.default_max_tokens == 32000
+    assert haiku.supports_thinking
+    assert not haiku.supports_adaptive_thinking
+    # Can't think by default without adaptive thinking
+    assert not haiku.thinks_by_default and not haiku.always_thinks
+    assert "thinking_effort" not in haiku.Options.model_fields
+    assert "application/pdf" not in haiku.attachment_types
+    kwargs = haiku.build_kwargs(llm.Prompt("Hi", haiku, options=haiku.Options()), None)
+    assert "thinking" not in kwargs
+
+    # Built-in models ignore the cache
+    sonnet = models["claude-sonnet-5-5"].model
+    assert sonnet.default_max_tokens == 128000
+    assert "application/pdf" in sonnet.attachment_types
+
+
+def test_invalid_refresh_cache_is_ignored(user_path, monkeypatch):
+    monkeypatch.setattr(llm_anthropic, "sdk_model_ids", lambda: [])
+    path = user_path / "anthropic_models.json"
+    for bad in ("not JSON", "[]", '{"data": [1, {"id": null}]}'):
+        path.write_text(bad)
+        assert llm_anthropic.cached_models() == []
+        assert "claude-opus-5-5" in _anthropic_models()
+
+
+def test_anthropic_refresh_command(user_path, monkeypatch):
+    from click.testing import CliRunner
+    from llm.cli import cli
+
+    monkeypatch.setattr(llm_anthropic, "sdk_model_ids", lambda: [])
+    models = [
+        {
+            "type": "model",
+            "id": "claude-opus-6",
+            "display_name": "Claude Opus 6",
+            "created_at": "2027-01-01T00:00:00Z",
+            "max_tokens": 256000,
+            "capabilities": _capability_details(),
+        },
+        {
+            "type": "model",
+            "id": "claude-opus-5-5",
+            "display_name": "Claude Opus 5.5",
+            "created_at": "2026-09-21T16:24:00Z",
+        },
+    ]
+
+    class FakeAnthropic:
+        def __init__(self, api_key):
+            assert api_key == "sk-test"
+            self.models = self
+            self.with_raw_response = self
+
+        def list(self, **kwargs):
+            self.http_response = self
+            return self
+
+        def json(self):
+            return {"data": list(models), "has_more": False}
+
+    monkeypatch.setattr(llm_anthropic, "Anthropic", FakeAnthropic)
+    path = user_path / "anthropic_models.json"
+    runner = CliRunner()
+    result = runner.invoke(cli, ["anthropic", "refresh", "--key", "sk-test"])
+    assert result.exit_code == 0, result.output
+    assert result.output == (
+        f"Saved 2 models to {path}\n" "Added models: claude-opus-6\n"
+    )
+    assert [m["id"] for m in json.loads(path.read_text())["data"]] == [
+        "claude-opus-6",
+        "claude-opus-5-5",
+    ]
+    assert llm.get_model("claude-opus-6").default_max_tokens == 256000
+
+    # Nothing changed
+    result = runner.invoke(cli, ["anthropic", "refresh", "--key", "sk-test"])
+    assert result.output == f"Saved 2 models to {path}\n"
+
+    # Model no longer available
+    models.pop(0)
+    result = runner.invoke(cli, ["anthropic", "refresh", "--key", "sk-test"])
+    assert result.output == (
+        f"Saved 1 model to {path}\n" "Removed models: claude-opus-6\n"
+    )
+    with pytest.raises(llm.UnknownModelError):
+        llm.get_model("claude-opus-6")
+
+
+def test_dotted_alias():
+    assert llm_anthropic._dotted_alias("claude-opus-5-6") == "claude-opus-5.6"
+    assert llm_anthropic._dotted_alias("claude-opus-4-1-20250805") == "claude-opus-4.1"
+    assert llm_anthropic._dotted_alias("claude-sonnet-4-20250514") is None
+    assert llm_anthropic._dotted_alias("claude-opus-6") is None
+    assert llm_anthropic._dotted_alias("claude-mythos-preview") is None
+
+
 @pytest.mark.vcr
 def test_count_tokens():
     model = llm.get_model("claude-opus-5")

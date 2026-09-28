@@ -1,4 +1,5 @@
 from anthropic import Anthropic, AsyncAnthropic, transform_schema
+from anthropic.types import Model as AnthropicModelID
 import enum
 import click
 import llm
@@ -13,6 +14,8 @@ from llm.parts import (
     ToolResultPart,
 )
 import json
+import re
+import typing
 from typing import Any, Dict, Optional, List
 from urllib.parse import urlsplit
 from pydantic import Field, ValidationError, field_validator, model_validator
@@ -21,6 +24,27 @@ from pydantic.json_schema import SkipJsonSchema
 DEFAULT_THINKING_TOKENS = 1024
 DEFAULT_TEMPERATURE = 1.0
 MCP_BETA = "mcp-client-2025-11-20"
+
+# Settings for the newest generation of Claude models. Models this plugin
+# has no built-in entry for - listed by the anthropic SDK, or cached by
+# "llm anthropic refresh" - start from these, adjusted by any capabilities
+# reported by the Anthropic models API
+LATEST_MODEL_DEFAULTS = dict(
+    supports_pdf=True,
+    supports_system_messages=True,
+    thinks_by_default=True,
+    always_thinks=True,
+    supports_thinking=True,
+    supports_thinking_effort=True,
+    supports_adaptive_thinking=True,
+    supports_web_search=True,
+    supports_code_execution=True,
+    use_structured_outputs=True,
+    default_max_tokens=128000,
+)
+# max_tokens for a model the API has not told us the limit for: the lowest
+# output limit of any current model, so requests are never rejected
+UNKNOWN_MODEL_MAX_TOKENS = 64000
 # Request parameters accepted by the count_tokens endpoint
 COUNT_TOKENS_PARAMS = {
     "model",
@@ -87,13 +111,7 @@ def register_commands(cli):
     @click.option("--key", help="Anthropic API key to use")
     def models(json_, key):
         "List models available from the Anthropic API"
-        api_key = llm.get_key(input=key, alias="anthropic", env="ANTHROPIC_API_KEY")
-        if not api_key:
-            raise click.ClickException(
-                "No key found - set one with 'llm keys set anthropic' "
-                "or the ANTHROPIC_API_KEY environment variable"
-            )
-        client = Anthropic(api_key=api_key)
+        client = Anthropic(api_key=_api_key(key))
         data = fetch_models(client)
         if json_:
             click.echo(json.dumps(data, indent=2))
@@ -106,6 +124,33 @@ def register_commands(cli):
                     (model.get("created_at") or "")[:10],
                 )
             )
+
+    @anthropic.command()
+    @click.option("--key", help="Anthropic API key to use")
+    def refresh(key):
+        """
+        Refresh the cached list of models from the Anthropic API
+
+        Models your API key can access that this version of the plugin does
+        not know about will be registered, using the capabilities reported
+        by the API.
+        """
+        client = Anthropic(api_key=_api_key(key))
+        data = fetch_models(client)
+        before = _registered_model_ids()
+        path = models_cache_path()
+        path.write_text(json.dumps(data, indent=2))
+        after = _registered_model_ids()
+        count = len(data["data"])
+        click.echo(
+            "Saved {} model{} to {}".format(count, "" if count == 1 else "s", path)
+        )
+        added = [model_id for model_id in after if model_id not in before]
+        removed = [model_id for model_id in before if model_id not in after]
+        if added:
+            click.echo("Added models: " + ", ".join(added))
+        if removed:
+            click.echo("Removed models: " + ", ".join(removed))
 
     prompt_command = cli.commands["prompt"]
     # llm prompt options that make no sense when counting tokens
@@ -185,8 +230,154 @@ def fetch_models(client):
     }
 
 
+def _api_key(key=None):
+    api_key = llm.get_key(input=key, alias="anthropic", env="ANTHROPIC_API_KEY")
+    if not api_key:
+        raise click.ClickException(
+            "No key found - set one with 'llm keys set anthropic' "
+            "or the ANTHROPIC_API_KEY environment variable"
+        )
+    return api_key
+
+
+def _registered_model_ids():
+    return [
+        model.claude_model_id
+        for model in llm.get_models()
+        if isinstance(model, ClaudeMessages)
+    ]
+
+
+def models_cache_path():
+    "Where 'llm anthropic refresh' saves the /v1/models response"
+    return llm.user_dir() / "anthropic_models.json"
+
+
+def cached_models():
+    "Model details saved by 'llm anthropic refresh', newest first"
+    path = models_cache_path()
+    if not path.exists():
+        return []
+    try:
+        return [
+            info
+            for info in json.loads(path.read_text())["data"]
+            if isinstance(info.get("id"), str)
+        ]
+    except (ValueError, KeyError, TypeError, AttributeError):
+        return []
+
+
+def sdk_model_ids():
+    "Model IDs listed by the anthropic SDK's Model type, newest first"
+    model_ids = []
+    for arg in typing.get_args(AnthropicModelID):
+        model_ids.extend(v for v in typing.get_args(arg) if isinstance(v, str))
+    return model_ids
+
+
+def _base_model_id(model_id):
+    """
+    Collapse the different IDs for the same model into one, e.g.
+    claude-haiku-4-5-20251001 and claude-haiku-4-5, or
+    claude-sonnet-4-20250514 and claude-sonnet-4-0
+    """
+    return re.sub(r"-(\d{8}|latest|0)$", "", model_id)
+
+
+def _dotted_alias(model_id):
+    "claude-opus-5-6 => claude-opus-5.6, claude-opus-4-1-20250805 => claude-opus-4.1"
+    match = re.match(r"^(claude-[a-z]+-\d+)-(\d{1,2})(-\d{8})?$", model_id)
+    if match:
+        return "{}.{}".format(match.group(1), match.group(2))
+    return None
+
+
+def model_kwargs_from_info(info):
+    """
+    Constructor arguments for a model with no built-in entry, starting from
+    LATEST_MODEL_DEFAULTS and applying whatever the models API reported
+    """
+    kwargs = dict(LATEST_MODEL_DEFAULTS)
+    kwargs["default_max_tokens"] = UNKNOWN_MODEL_MAX_TOKENS
+    if isinstance(info.get("max_tokens"), int):
+        kwargs["default_max_tokens"] = info["max_tokens"]
+    capabilities = info.get("capabilities")
+    if isinstance(capabilities, dict):
+
+        def supported(*path):
+            node = capabilities
+            for key in path:
+                node = node.get(key) if isinstance(node, dict) else None
+            return bool(isinstance(node, dict) and node.get("supported"))
+
+        kwargs.update(
+            supports_images=supported("image_input"),
+            supports_pdf=supported("pdf_input"),
+            supports_thinking=supported("thinking"),
+            supports_adaptive_thinking=supported("thinking", "types", "adaptive"),
+            supports_thinking_effort=supported("effort"),
+            supports_code_execution=supported("code_execution"),
+            use_structured_outputs=supported("structured_outputs"),
+        )
+        # Thinking by default is implemented using adaptive thinking
+        if not (kwargs["supports_thinking"] and kwargs["supports_adaptive_thinking"]):
+            kwargs["thinks_by_default"] = False
+            kwargs["always_thinks"] = False
+    return kwargs
+
+
+def extra_models(builtin):
+    """
+    Models with no built-in entry, as a list of (model_id, kwargs, aliases)
+
+    ``builtin`` maps each Claude model ID registered by register_builtin_models()
+    to its aliases. Candidates come from the anthropic SDK's list of model IDs
+    and from the models API response cached by 'llm anthropic refresh'.
+    """
+    candidates = {}
+    # Oldest first, so they show up in release order in 'llm models'
+    for model_id in reversed(sdk_model_ids()):
+        candidates.setdefault(_base_model_id(model_id), {"id": model_id})
+    for info in reversed(cached_models()):
+        # Details from the API win over a bare ID from the SDK
+        candidates[_base_model_id(info["id"])] = info
+    builtin_bases = {_base_model_id(model_id) for model_id in builtin}
+    taken = set(builtin)
+    for aliases in builtin.values():
+        taken.update(aliases)
+    extras = []
+    for base, info in candidates.items():
+        if base in builtin_bases:
+            continue
+        model_id = info["id"]
+        aliases = []
+        for alias in (model_id, _dotted_alias(model_id)):
+            if alias and alias not in taken:
+                aliases.append(alias)
+                taken.add(alias)
+        extras.append((model_id, model_kwargs_from_info(info), tuple(aliases)))
+    return extras
+
+
 @llm.hookimpl
 def register_models(register):
+    builtin = {}
+
+    def register_builtin(model, async_model=None, aliases=None):
+        builtin[model.claude_model_id] = tuple(aliases or ())
+        register(model, async_model, aliases=aliases)
+
+    register_builtin_models(register_builtin)
+    for model_id, kwargs, aliases in extra_models(builtin):
+        register(
+            ClaudeMessages(model_id, **kwargs),
+            AsyncClaudeMessages(model_id, **kwargs),
+            aliases=aliases,
+        )
+
+
+def register_builtin_models(register):
     # https://docs.anthropic.com/claude/docs/models-overview
     register(
         ClaudeMessages("claude-3-opus-20240229"),
@@ -641,33 +832,9 @@ def register_models(register):
     for model_id in ("opus-5.5", "sonnet-5.5"):
         model_id_underscore = model_id.replace(".", "-")
         register(
-            ClaudeMessages(
-                f"claude-{model_id_underscore}",
-                supports_pdf=True,
-                supports_system_messages=True,
-                thinks_by_default=True,
-                always_thinks=True,
-                supports_thinking=True,
-                supports_thinking_effort=True,
-                supports_adaptive_thinking=True,
-                supports_web_search=True,
-                supports_code_execution=True,
-                use_structured_outputs=True,
-                default_max_tokens=128000,
-            ),
+            ClaudeMessages(f"claude-{model_id_underscore}", **LATEST_MODEL_DEFAULTS),
             AsyncClaudeMessages(
-                f"claude-{model_id_underscore}",
-                supports_pdf=True,
-                supports_system_messages=True,
-                thinks_by_default=True,
-                always_thinks=True,
-                supports_thinking=True,
-                supports_thinking_effort=True,
-                supports_adaptive_thinking=True,
-                supports_web_search=True,
-                supports_code_execution=True,
-                use_structured_outputs=True,
-                default_max_tokens=128000,
+                f"claude-{model_id_underscore}", **LATEST_MODEL_DEFAULTS
             ),
             aliases=(f"claude-{model_id}",),
         )

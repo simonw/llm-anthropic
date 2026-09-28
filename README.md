@@ -67,6 +67,25 @@ Example output:
 }
 ```
 
+## New models
+
+This plugin includes built-in settings for each Claude model it supports. You can also use models that were released after the version of the plugin you have installed:
+
+- Model IDs listed by the [anthropic Python library](https://github.com/anthropics/anthropic-sdk-python) are registered automatically. Run `llm install -U anthropic` to upgrade that library and pick up newly released models.
+- Run `llm anthropic refresh` to fetch the models available to your API key from the [Anthropic models API](https://docs.anthropic.com/en/api/models-list). Any that this plugin does not know about will be registered using the capabilities reported by the API: image and PDF input, thinking, effort, structured outputs and maximum output tokens.
+
+```bash
+llm anthropic refresh
+```
+Example output:
+```
+Saved 12 models to /Users/you/Library/Application Support/io.datasette.llm/anthropic_models.json
+Added models: claude-opus-6
+```
+The list is cached in `anthropic_models.json` in your LLM user directory. Run the command again to update it.
+
+Models without built-in settings are otherwise treated like the most recent Claude models, so they think by default using adaptive thinking. If the models API has not reported a model's output limit, `max_tokens` defaults to 64,000.
+
 ## Web search
 
 Newer models support Anthropic's [web search tool](https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-search-tool) for real-time information, using the `-T WebSearch` server-side tool:
