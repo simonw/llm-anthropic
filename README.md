@@ -32,31 +32,31 @@ llm anthropic models
 ```
 Example output:
 ```
+claude-sonnet-5-5: Claude Sonnet 5.5 (created 2026-09-28)
 claude-opus-5-5: Claude Opus 5.5 (created 2026-09-21)
 claude-fable-5-1: Claude Fable 5.1 (created 2026-08-28)
-claude-sonnet-5: Claude Sonnet 5 (created 2026-06-29)
 ```
 Add `--json` to see the full JSON returned by the API, including details of each model's capabilities. Use `--key` to pass a different API key.
 
 Run prompts like this:
 ```bash
 llm -m claude-opus-5.5 'Fun facts about walruses'
-llm -m claude-sonnet-5 'Fun facts about pelicans'
+llm -m claude-sonnet-5.5 'Fun facts about pelicans'
 llm -m claude-haiku-4.5 'Fun facts about cormorants'
 ```
 Image attachments are supported too:
 ```bash
-llm -m claude-sonnet-5 'describe this image' -a https://static.simonwillison.net/static/2024/pelicans.jpg
+llm -m claude-sonnet-5.5 'describe this image' -a https://static.simonwillison.net/static/2024/pelicans.jpg
 llm -m claude-haiku-4.5 'extract text' -a page.png
 ```
 Claude 3.5 and later models can handle PDF files:
 ```bash
-llm -m claude-sonnet-5 'extract text' -a page.pdf
+llm -m claude-sonnet-5.5 'extract text' -a page.pdf
 ```
-Anthropic's models support [schemas](https://llm.datasette.io/en/stable/schemas.html). Here's how to use Claude 4 Sonnet to invent a dog:
+Anthropic's models support [schemas](https://llm.datasette.io/en/stable/schemas.html). Here's how to use Claude Sonnet 5.5 to invent a dog:
 
 ```bash
-llm -m claude-sonnet-5 --schema 'name,age int,bio: one sentence' 'invent a surprising dog'
+llm -m claude-sonnet-5.5 --schema 'name,age int,bio: one sentence' 'invent a surprising dog'
 ```
 Example output:
 ```json
@@ -91,12 +91,12 @@ Models without built-in settings are otherwise treated like the most recent Clau
 Newer models support Anthropic's [web search tool](https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-search-tool) for real-time information, using the `-T WebSearch` server-side tool:
 
 ```bash
-llm -m claude-sonnet-5 -T WebSearch 'What is the current weather in San Francisco?'
+llm -m claude-sonnet-5.5 -T WebSearch 'What is the current weather in San Francisco?'
 ```
 The tool accepts optional configuration:
 
 ```bash
-llm -m claude-sonnet-5 \
+llm -m claude-sonnet-5.5 \
   -T 'WebSearch(max_uses=2, user_location={"city": "London", "country": "GB"})' \
   'Recent headlines'
 ```
@@ -115,14 +115,14 @@ On Claude 4.6 and later models this uses the `web_search_20260318` tool version 
 Models that support web search can also use Anthropic's [web fetch tool](https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-fetch-tool) to retrieve the full content of a URL, using the `-T WebFetch` server-side tool:
 
 ```bash
-llm -m claude-sonnet-5 -T WebFetch 'Fetch https://www.example.com/ and quote its first heading'
+llm -m claude-sonnet-5.5 -T WebFetch 'Fetch https://www.example.com/ and quote its first heading'
 ```
 For security reasons Claude can only fetch URLs that already appear in the conversation - provided by you or returned by a previous web search or fetch.
 
 The tool accepts optional configuration:
 
 ```bash
-llm -m claude-sonnet-5 \
+llm -m claude-sonnet-5.5 \
   -T 'WebFetch(max_uses=2, max_content_tokens=20000)' \
   'Summarize https://www.example.com/'
 ```
@@ -142,7 +142,7 @@ From Python, pass an instance of the `WebFetch` class in `tools=`:
 import llm
 from llm_anthropic import WebFetch
 
-model = llm.get_model("claude-sonnet-5")
+model = llm.get_model("claude-sonnet-5.5")
 response = model.prompt(
     "Fetch https://www.example.com/ and quote its first heading",
     tools=[WebFetch(max_uses=1)],
@@ -155,7 +155,7 @@ print(response.text())
 Models that support web search can also call tools on remote [MCP servers](https://platform.claude.com/docs/en/agents-and-tools/mcp-connector) using the `AnthropicMCP` server-side tool. Anthropic connects to the server from their own infrastructure - it must be reachable over HTTPS:
 
 ```bash
-llm -m claude-sonnet-5 \
+llm -m claude-sonnet-5.5 \
   -T 'AnthropicMCP(url="https://mcp.deepwiki.com/mcp", name="deepwiki")' \
   'Use the deepwiki tools to say what simonw/llm does, one sentence'
 ```
@@ -167,7 +167,7 @@ Available arguments:
 - `allowed_tools`: optional list of tool names - if provided, only those tools are enabled
 
 ```bash
-llm -m claude-sonnet-5 \
+llm -m claude-sonnet-5.5 \
   -T 'AnthropicMCP(url="https://mcp.deepwiki.com/mcp", name="deepwiki", allowed_tools=["ask_question"])' \
   'What does simonw/llm do?'
 ```
@@ -180,7 +180,7 @@ From Python, pass an instance of the `AnthropicMCP` class in `tools=`:
 import llm
 from llm_anthropic import AnthropicMCP
 
-model = llm.get_model("claude-sonnet-5")
+model = llm.get_model("claude-sonnet-5.5")
 response = model.prompt(
     "Use the deepwiki tools to say what simonw/llm does, one sentence",
     tools=[AnthropicMCP(url="https://mcp.deepwiki.com/mcp", name="deepwiki")],
@@ -224,7 +224,7 @@ It outputs the number of tokens:
 ```
 The command accepts the same options as `llm prompt`, so the count reflects the exact request that would be sent. That includes system prompts, attachments, fragments, templates, tools, schemas, model options and previous messages in a conversation:
 ```bash
-cat code.py | llm anthropic count -m claude-sonnet-5 -s 'Review this code'
+cat code.py | llm anthropic count -m claude-sonnet-5.5 -s 'Review this code'
 llm anthropic count -m claude-opus-5 'Describe this' -a pelican.jpg
 llm anthropic count -m claude-opus-5 --schema 'name, age int' 'Invent a dog'
 llm anthropic count -m claude-opus-5 -T llm_time -o thinking_effort high 'What time is it?'
@@ -305,7 +305,7 @@ Anthropic models can spend [thinking tokens](https://platform.claude.com/docs/en
 ```bash
 llm -m claude-opus-5 -o thinking_effort max 'Design a fair algorithm for splitting rent between roommates with different sized rooms'
 ```
-Sonnet 5 and Opus 5 can have thinking turned off entirely with `-o thinking 0`. Fable models always think - disabling it raises an error.
+Sonnet 5 and Opus 5 can have thinking turned off entirely with `-o thinking 0`. Fable models and the 5.5 models always think - disabling it raises an error.
 
 **Claude 4.6 and older models do not think unless asked.** Enable thinking with `-o thinking 1`:
 
@@ -432,40 +432,25 @@ This example sets `` ``` `` as the stop sequence, so the response will be a Pyth
 
 To pass a single stop sequence, send a string:
 ```bash
-llm -m claude-sonnet-5 'Fun facts about pelicans' \
-  -o stop_sequences "beak"
+llm -m claude-sonnet-5.5 'Fun facts about pelicans' \
+  -o stop_sequences "pouch"
 ```
 For multiple stop sequences, pass a JSON array:
 
 ```bash
-llm -m claude-sonnet-5 'Fun facts about pelicans' \
+llm -m claude-sonnet-5.5 'Fun facts about pelicans' \
   -o stop_sequences '["beak", "feathers"]'
 ```
 
 ## Development
 
-To set up this plugin locally, first checkout the code. Then create a new virtual environment:
-```bash
-cd llm-anthropic
-python3 -m venv venv
-source venv/bin/activate
-```
-Now install the dependencies and test dependencies:
-```bash
-pip install -e . --group dev
-```
-To run the tests:
-```bash
-pytest
-```
-
-Alternatively, if you have [uv](https://github.com/astral-sh/uv) you can run tests without first creating a virtual environment like this:
+To set up this plugin locally, first checkout the code. Then use [uv](https://github.com/astral-sh/uv) to run the tests:
 ```bash
 uv run pytest
 uv run pytest -k test_tools
 ```
 
-You can also run the `llm` command in a `uv` managed environment like this:
+To execute the `llm` command via `uv`:
 ```bash
 uv run llm 'your prompt here'
 ```
