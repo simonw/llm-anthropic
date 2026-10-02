@@ -275,6 +275,44 @@ model = ClaudeMessages(
 print(model.prompt("Fun facts about pangolins", key="eyJh..."))
 ```
 
+## Anthropic-compatible endpoints
+
+Configure separate model entries in `extra-anthropic-models.yaml` in your LLM user directory, alongside `keys.json`. Each entry has its own endpoint, key name and model name sent to the API:
+
+```yaml
+- model_id: gateway-a
+  model_name: provider-model
+  api_base: https://gateway-a.example/anthropic
+  api_key_name: gateway-a
+  aliases: [fast]
+- model_id: gateway-b
+  model_name: provider-model
+  api_base: https://gateway-b.example/anthropic
+  api_key_name: gateway-b
+```
+
+Replace the example addresses and API model names with those supplied by your provider. The endpoint must implement the Anthropic Messages API, including streaming responses.
+
+Find the directory with `dirname "$(llm logs path)"`, then store the keys using LLM's existing key management:
+
+```bash
+llm keys set gateway-a
+llm keys set gateway-b
+llm -m fast "Hello"
+llm -m gateway-b --async "Hello"
+```
+
+The four fields shown above are required; `aliases` is an optional list of additional names. Model IDs and aliases must be unique within this plugin, including its built-in and discovered models. Entries use canonical IDs such as `anthropic/gateway-a` for logs and model option defaults. Two entries can use the same API model name while keeping their options separate:
+
+```bash
+llm models options set gateway-a max_tokens 4096
+llm models options set gateway-b max_tokens 8192
+```
+
+`api_key_name` references a key stored by `llm keys set`; do not put API key values in this file or the URL. A missing named key raises an error instead of falling back to the official Anthropic key or `ANTHROPIC_API_KEY`. An explicit `--key` still overrides the selected key using LLM's usual rules.
+
+Both `llm.get_model("gateway-a")` and `llm.get_async_model("gateway-a")` work. Loading these entries reads only the local configuration; it does not call the provider's models API. Invalid configuration is reported before this plugin registers any models. Built-in and cached model settings remain unchanged.
+
 ## Mid-conversation system messages
 
 Claude Opus 4.8 and the Claude 5 family models accept [updated system instructions part-way through a conversation](https://platform.claude.com/docs/en/build-with-claude/mid-conversation-system-messages), which preserves prompt cache hits on earlier turns. Pass a `system` message in an explicit `messages=` chain:

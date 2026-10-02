@@ -16,9 +16,18 @@ from llm.parts import (
 import json
 import re
 import typing
+import yaml
 from typing import Any, Dict, Optional, List
 from urllib.parse import urlsplit
-from pydantic import Field, ValidationError, field_validator, model_validator
+from pydantic import (
+    AnyHttpUrl,
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 from pydantic.json_schema import SkipJsonSchema
 
 DEFAULT_THINKING_TOKENS = 1024
@@ -244,7 +253,7 @@ def _registered_model_ids():
     return [
         model.claude_model_id
         for model in llm.get_models()
-        if isinstance(model, ClaudeMessages)
+        if isinstance(model, ClaudeMessages) and model.base_url is None
     ]
 
 
@@ -360,21 +369,123 @@ def extra_models(builtin):
     return extras
 
 
+class _ConfiguredModel(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    model_id: str
+    model_name: str
+    api_base: AnyHttpUrl
+    api_key_name: str
+    aliases: tuple[str, ...] = ()
+
+    @field_validator("model_id", "model_name", "api_key_name")
+    @classmethod
+    def non_blank(cls, value):
+        if not value.strip():
+            raise ValueError("must not be blank")
+        if value != value.strip():
+            raise ValueError("must not have surrounding whitespace")
+        return value
+
+    @field_validator("aliases")
+    @classmethod
+    def non_blank_aliases(cls, value):
+        if any(not alias.strip() for alias in value):
+            raise ValueError("aliases must not be blank")
+        if any(alias != alias.strip() for alias in value):
+            raise ValueError("aliases must not have surrounding whitespace")
+        return value
+
+    @field_validator("api_base")
+    @classmethod
+    def no_url_credentials(cls, value):
+        if value.username is not None or value.password is not None:
+            raise ValueError("use api_key_name instead of credentials in the URL")
+        return value
+
+
+def configured_models(existing_names):
+    path = llm.user_dir() / "extra-anthropic-models.yaml"
+    try:
+        document = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return []
+    except (OSError, UnicodeError):
+        raise click.ClickException(f"Cannot read {path}") from None
+    except yaml.YAMLError as ex:
+        mark = getattr(ex, "problem_mark", None)
+        location = f" at line {mark.line + 1}, column {mark.column + 1}" if mark else ""
+        raise click.ClickException(f"Invalid YAML in {path}{location}") from None
+
+    if document is None:
+        return []
+    if not isinstance(document, list):
+        raise click.ClickException(f"{path} must contain a list of models")
+
+    taken = set(existing_names)
+    registrations = []
+    for index, item in enumerate(document, 1):
+        try:
+            config = _ConfiguredModel.model_validate(item)
+        except ValidationError as ex:
+            errors = ex.errors(
+                include_input=False, include_context=False, include_url=False
+            )
+            details = "; ".join(
+                "{}: {}".format(".".join(map(str, error["loc"])), error["msg"])
+                for error in errors
+            )
+            raise click.ClickException(
+                f"Invalid model {index} in {path}: {details}"
+            ) from None
+
+        models = [
+            cls(
+                config.model_id,
+                claude_model_id=config.model_name,
+                base_url=str(config.api_base),
+            )
+            for cls in (ClaudeMessages, AsyncClaudeMessages)
+        ]
+        aliases = (config.model_id, *config.aliases)
+        names = (models[0].model_id, *aliases)
+        if len(set(names)) != len(names) or taken.intersection(names):
+            raise click.ClickException(
+                f"Invalid model {index} in {path}: model ID or alias already registered"
+            )
+        taken.update(names)
+        for model in models:
+            model.needs_key = config.api_key_name
+            model.key_env_var = None
+        registrations.append((models[0], models[1], aliases))
+    return registrations
+
+
 @llm.hookimpl
 def register_models(register):
     builtin = {}
+    taken = set()
+    registrations = []
+
+    def register_tracked(model, async_model=None, aliases=None):
+        taken.add(model.model_id)
+        taken.update(aliases or ())
+        registrations.append((model, async_model, aliases))
 
     def register_builtin(model, async_model=None, aliases=None):
         builtin[model.claude_model_id] = tuple(aliases or ())
-        register(model, async_model, aliases=aliases)
+        register_tracked(model, async_model, aliases=aliases)
 
     register_builtin_models(register_builtin)
     for model_id, kwargs, aliases in extra_models(builtin):
-        register(
+        register_tracked(
             ClaudeMessages(model_id, **kwargs),
             AsyncClaudeMessages(model_id, **kwargs),
             aliases=aliases,
         )
+    registrations.extend(configured_models(taken))
+    for model, async_model, aliases in registrations:
+        register(model, async_model, aliases=aliases)
 
 
 def register_builtin_models(register):
