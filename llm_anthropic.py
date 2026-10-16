@@ -900,16 +900,18 @@ class ClaudeOptions(llm.Options):
     @field_validator("stop_sequences")
     def validate_stop_sequences(cls, stop_sequences):
         error_msg = "stop_sequences must be a list of strings or a single string"
+        if stop_sequences is None:
+            return None
         if isinstance(stop_sequences, str):
             try:
-                stop_sequences = json.loads(stop_sequences)
-                if not isinstance(stop_sequences, list) or not all(
-                    isinstance(seq, str) for seq in stop_sequences
-                ):
-                    raise ValueError(error_msg)
-                return stop_sequences
+                decoded = json.loads(stop_sequences)
             except json.JSONDecodeError:
                 return [stop_sequences]
+            if not isinstance(decoded, list):
+                return [stop_sequences]
+            if not all(isinstance(seq, str) for seq in decoded):
+                raise ValueError(error_msg)
+            return decoded
         elif isinstance(stop_sequences, list):
             if not all(isinstance(seq, str) for seq in stop_sequences):
                 raise ValueError(error_msg)
