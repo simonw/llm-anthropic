@@ -1892,6 +1892,37 @@ def test_fable_5_1_kwargs():
     assert "tool_choice" not in schema_kwargs
 
 
+@pytest.mark.parametrize("version", ["fable-5.2", "mythos-5.2"])
+def test_5_2_models_registered(version):
+    dashed = version.replace(".", "-")
+    for model in (
+        llm.get_model(f"claude-{version}"),
+        llm.get_async_model(f"claude-{version}"),
+    ):
+        assert model.model_id == f"anthropic/claude-{dashed}"
+        assert model.claude_model_id == f"claude-{dashed}"
+        assert "application/pdf" in model.attachment_types
+        assert model.supports_thinking_effort
+        assert model.supports_adaptive_thinking
+        assert model.supports_web_search
+        assert model.supports_code_execution
+        assert model.thinks_by_default
+        assert model.always_thinks
+        assert model.use_structured_outputs
+        assert model.default_max_tokens == 128000
+    model = llm.get_model(f"claude-{version}")
+    prompt = llm.Prompt("Hi", model, options=model.Options(thinking=False))
+    with pytest.raises(ValueError, match="cannot be disabled"):
+        model.build_kwargs(prompt, None)
+    # Forced tool_choice is rejected, so schemas must use structured outputs
+    schema_prompt = llm.Prompt(
+        "Hi", model, options=model.Options(), schema={"type": "object"}
+    )
+    schema_kwargs = model.build_kwargs(schema_prompt, None)
+    assert schema_kwargs["output_config"]["format"]["type"] == "json_schema"
+    assert "tool_choice" not in schema_kwargs
+
+
 def test_thinking_false_fable_5_1_raises():
     model = llm.get_model("claude-fable-5.1")
     prompt = llm.Prompt("Hi", model, options=model.Options(thinking=False))

@@ -828,8 +828,8 @@ def register_builtin_models(register):
         ),
         aliases=("claude-fable-5.1",),
     )
-    # claude-opus-5.5, claude-sonnet-5.5
-    for model_id in ("opus-5.5", "sonnet-5.5"):
+    # claude-opus-5.5, claude-sonnet-5.5, claude-fable-5.2, claude-mythos-5.2
+    for model_id in ("opus-5.5", "sonnet-5.5", "fable-5.2", "mythos-5.2"):
         model_id_underscore = model_id.replace(".", "-")
         register(
             ClaudeMessages(f"claude-{model_id_underscore}", **LATEST_MODEL_DEFAULTS),
