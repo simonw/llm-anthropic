@@ -1445,10 +1445,21 @@ class _Shared:
                 if content is not None:
                     block["content"] = content
                 return block
+            content = part.output
+            if part.attachments:
+                content = []
+                if part.output:
+                    content.append({"type": "text", "text": part.output})
+                content.extend(
+                    self._part_to_block(
+                        AttachmentPart(attachment=attachment), inline_urls
+                    )
+                    for attachment in part.attachments
+                )
             return {
                 "type": "tool_result",
                 "tool_use_id": part.tool_call_id,
-                "content": part.output,
+                "content": content,
             }
         if isinstance(part, AttachmentPart) and part.attachment is not None:
             attachment = part.attachment

@@ -787,6 +787,332 @@ def _build_messages_for(prompt_kwargs):
     return model.build_messages(p, None)
 
 
+@pytest.fixture
+def tool_result_attachments():
+    return [
+        llm.Attachment(type="image/png", content=TINY_PNG),
+        llm.Attachment(type="application/pdf", content=b"%PDF-1.4\nexample\n%%EOF"),
+    ]
+
+
+@pytest.fixture
+def native_tool_transport(monkeypatch):
+    """Capture serialized requests through the real SDK, without opening sockets."""
+    import asyncio
+
+    import httpx2
+    from anthropic import Anthropic, AsyncAnthropic
+
+    requests = []
+
+    def handle(request):
+        body = json.loads(request.content)
+        requests.append(body)
+        if request.url.path.endswith("/count_tokens"):
+            return httpx2.Response(200, json={"input_tokens": 42})
+        has_result = any(
+            block["type"] == "tool_result"
+            for message in body["messages"]
+            for block in message["content"]
+        )
+        block = (
+            {"type": "text", "text": ""}
+            if has_result
+            else {
+                "type": "tool_use",
+                "id": "toolu_report",
+                "name": "report",
+                "input": {},
+            }
+        )
+        delta = (
+            {"type": "text_delta", "text": "Reviewed"}
+            if has_result
+            else {"type": "input_json_delta", "partial_json": "{}"}
+        )
+        events = [
+            {
+                "type": "message_start",
+                "message": {
+                    "id": "msg_test",
+                    "type": "message",
+                    "role": "assistant",
+                    "model": body["model"],
+                    "content": [],
+                    "stop_reason": None,
+                    "stop_sequence": None,
+                    "usage": {"input_tokens": 10, "output_tokens": 0},
+                },
+            },
+            {"type": "content_block_start", "index": 0, "content_block": block},
+            {"type": "content_block_delta", "index": 0, "delta": delta},
+            {"type": "content_block_stop", "index": 0},
+            {
+                "type": "message_delta",
+                "delta": {
+                    "stop_reason": "end_turn" if has_result else "tool_use",
+                    "stop_sequence": None,
+                },
+                "usage": {"output_tokens": 1},
+            },
+            {"type": "message_stop"},
+        ]
+        return httpx2.Response(
+            200,
+            headers={"content-type": "text/event-stream"},
+            content="".join(
+                "event: {}\ndata: {}\n\n".format(event["type"], json.dumps(event))
+                for event in events
+            ).encode(),
+        )
+
+    transport = httpx2.MockTransport(handle)
+    client = Anthropic(
+        api_key="sk-test", http_client=httpx2.Client(transport=transport)
+    )
+    async_client = AsyncAnthropic(
+        api_key="sk-test", http_client=httpx2.AsyncClient(transport=transport)
+    )
+    monkeypatch.setattr(llm_anthropic, "Anthropic", lambda **kwargs: client)
+    monkeypatch.setattr(llm_anthropic, "AsyncAnthropic", lambda **kwargs: async_client)
+    yield requests
+    client.close()
+    asyncio.run(async_client.close())
+
+
+def _tool_result_history(part):
+    return [
+        llm.user("Read the report"),
+        llm.assistant(
+            ToolCallPart(name="report", arguments={}, tool_call_id=part.tool_call_id)
+        ),
+        llm.tool_message(part),
+    ]
+
+
+def _attachment_blocks(attachments):
+    return [
+        {
+            "type": "document" if attachment.type == "application/pdf" else "image",
+            "source": {
+                "type": "base64",
+                "media_type": attachment.type,
+                "data": base64.b64encode(attachment.content).decode(),
+            },
+        }
+        for attachment in attachments
+    ]
+
+
+def _assert_nested_tool_attachments(request, attachments, output):
+    assert [message["role"] for message in request["messages"]] == [
+        "user",
+        "assistant",
+        "user",
+    ]
+    assert request["messages"][-1]["content"] == [
+        {
+            "type": "tool_result",
+            "tool_use_id": "toolu_report",
+            "content": ([{"type": "text", "text": output}] if output else [])
+            + _attachment_blocks(attachments),
+        }
+    ]
+
+
+@pytest.mark.parametrize("use_conversation", [False, True])
+def test_manual_tool_result_attachments(
+    native_tool_transport, tool_result_attachments, use_conversation
+):
+    from copy import deepcopy
+
+    executed = []
+
+    def report():
+        executed.append(True)
+        return llm.ToolOutput(
+            output="Report ready", attachments=tool_result_attachments
+        )
+
+    model = llm.get_model("claude-haiku-4.5")
+    target = model.conversation() if use_conversation else model
+    first = target.prompt("Read the report", tools=[report], key="sk-test")
+    results = first.execute_tool_calls()
+    assert executed == [True]
+    assert results[0].attachments == tool_result_attachments
+    before = deepcopy(results)
+    kwargs = (
+        {}
+        if use_conversation
+        else {"messages": first.prompt.messages + first.messages()}
+    )
+    continuation = target.prompt(
+        tool_results=results, tools=[report], key="sk-test", **kwargs
+    )
+    assert continuation.text() == "Reviewed"
+    assert len(native_tool_transport) == 2
+    _assert_nested_tool_attachments(
+        native_tool_transport[-1], tool_result_attachments, "Report ready"
+    )
+    assert results == before
+
+
+@pytest.mark.asyncio
+async def test_async_manual_tool_result_attachments(
+    native_tool_transport, tool_result_attachments
+):
+    from copy import deepcopy
+
+    executed = []
+
+    async def report():
+        executed.append(True)
+        return llm.ToolOutput(
+            output="Report ready", attachments=tool_result_attachments
+        )
+
+    conversation = llm.get_async_model("claude-haiku-4.5").conversation()
+    first = await conversation.prompt("Read the report", tools=[report], key="sk-test")
+    results = await first.execute_tool_calls()
+    assert executed == [True]
+    assert results[0].attachments == tool_result_attachments
+    before = deepcopy(results)
+    continuation = await conversation.prompt(tool_results=results, key="sk-test")
+    assert await continuation.text() == "Reviewed"
+    assert len(native_tool_transport) == 2
+    _assert_nested_tool_attachments(
+        native_tool_transport[-1], tool_result_attachments, "Report ready"
+    )
+    assert results == before
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("asynchronous", [False, True])
+async def test_explicit_tool_result_attachments(
+    native_tool_transport, tool_result_attachments, asynchronous
+):
+    from copy import deepcopy
+
+    messages = _tool_result_history(
+        ToolResultPart(
+            name="report",
+            output="",
+            tool_call_id="toolu_report",
+            attachments=tool_result_attachments,
+        )
+    )
+    before = deepcopy(messages)
+    model = (llm.get_async_model if asynchronous else llm.get_model)("claude-haiku-4.5")
+    response = model.prompt(messages=messages, key="sk-test")
+    if asynchronous:
+        response = await response
+        assert await response.text() == "Reviewed"
+    else:
+        assert response.text() == "Reviewed"
+    _assert_nested_tool_attachments(
+        native_tool_transport[-1], tool_result_attachments, ""
+    )
+    assert messages == before
+
+
+@pytest.mark.parametrize("output", ["Report ready", ""])
+def test_plain_tool_result_stays_string(output):
+    messages = _build_messages_for(
+        {
+            "messages": _tool_result_history(
+                ToolResultPart(
+                    name="report", output=output, tool_call_id="toolu_report"
+                )
+            )
+        }
+    )
+    assert messages[-1]["content"] == [
+        {"type": "tool_result", "tool_use_id": "toolu_report", "content": output}
+    ]
+
+
+@pytest.mark.parametrize("continuation", ["chain", "reply"])
+def test_automated_tool_result_attachments_once(
+    native_tool_transport, tool_result_attachments, continuation
+):
+    def report():
+        return llm.ToolOutput(
+            output="Report ready", attachments=tool_result_attachments
+        )
+
+    model = llm.get_model("claude-haiku-4.5")
+    if continuation == "chain":
+        response = model.chain("Read the report", tools=[report], key="sk-test")
+    else:
+        first = model.prompt("Read the report", tools=[report], key="sk-test")
+        response = first.reply(key="sk-test")
+    assert response.text().endswith("Reviewed")
+    assert len(native_tool_transport) == 2
+    assert native_tool_transport[-1]["messages"][-1]["content"] == [
+        {
+            "type": "tool_result",
+            "tool_use_id": "toolu_report",
+            "content": "Report ready",
+        },
+        *_attachment_blocks(tool_result_attachments),
+    ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("asynchronous", [False, True])
+async def test_count_tokens_inlines_tool_result_attachments(
+    native_tool_transport, tool_result_attachments, monkeypatch, asynchronous
+):
+    from copy import deepcopy
+
+    attachments = [
+        llm.Attachment(
+            type=attachment.type, url="https://example.com/report/" + str(index)
+        )
+        for index, attachment in enumerate(tool_result_attachments)
+    ]
+    fetched = []
+
+    def content_bytes(self):
+        fetched.append(self.url)
+        return tool_result_attachments[attachments.index(self)].content
+
+    monkeypatch.setattr(llm.Attachment, "content_bytes", content_bytes)
+    messages = _tool_result_history(
+        ToolResultPart(
+            name="report",
+            output="Report ready",
+            tool_call_id="toolu_report",
+            attachments=attachments,
+        )
+    )
+    before = deepcopy(messages)
+    model = (llm.get_async_model if asynchronous else llm.get_model)("claude-haiku-4.5")
+    count = model.count_tokens(messages=messages, key="sk-test")
+    assert (await count if asynchronous else count) == 42
+    assert fetched == [attachment.url for attachment in attachments]
+    _assert_nested_tool_attachments(
+        native_tool_transport[-1], tool_result_attachments, "Report ready"
+    )
+    response = model.prompt(messages=messages, key="sk-test")
+    if asynchronous:
+        response = await response
+        assert await response.text() == "Reviewed"
+    else:
+        assert response.text() == "Reviewed"
+    assert native_tool_transport[-1]["messages"][-1]["content"][0]["content"] == [
+        {"type": "text", "text": "Report ready"},
+        *[
+            {"type": block["type"], "source": {"type": "url", "url": attachment.url}}
+            for block, attachment in zip(
+                _attachment_blocks(tool_result_attachments), attachments
+            )
+        ],
+    ]
+    assert fetched == [attachment.url for attachment in attachments]
+    assert messages == before
+
+
 def test_build_messages_simple_user_text():
     from llm import user
 
