@@ -741,7 +741,7 @@ def register_builtin_models(register):
         ClaudeMessages(
             "claude-sonnet-5",
             supports_pdf=True,
-            supports_system_messages=True,
+            supports_system_messages=False,
             thinks_by_default=True,
             supports_thinking=True,
             supports_thinking_effort=True,
@@ -754,7 +754,7 @@ def register_builtin_models(register):
         AsyncClaudeMessages(
             "claude-sonnet-5",
             supports_pdf=True,
-            supports_system_messages=True,
+            supports_system_messages=False,
             thinks_by_default=True,
             supports_thinking=True,
             supports_thinking_effort=True,
@@ -1518,7 +1518,7 @@ class _Shared:
         The first message in the chain is hoisted to the top-level
         kwargs["system"] field by _extract_system. Later ones become inline
         role="system" entries on models that support mid-conversation
-        system messages (Opus 4.8 and the Claude 5 family)."""
+        system messages (for example, Opus 4.8 and Opus 5)."""
         if is_first:
             return
         if not self.supports_system_messages:

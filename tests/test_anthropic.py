@@ -1021,11 +1021,15 @@ def test_extract_system_prefers_prompt_system_over_messages():
     assert model._extract_system(p) == "legacy sys"
 
 
-def test_mid_conversation_system_message_sent_inline():
+@pytest.mark.parametrize(
+    "model_id", ["claude-opus-4.8", "claude-opus-5", "claude-sonnet-5.5"]
+)
+@pytest.mark.parametrize("get_model", [llm.get_model, llm.get_async_model])
+def test_mid_conversation_system_message_sent_inline(model_id, get_model):
     # https://github.com/simonw/llm-anthropic/issues/73
     from llm import system, user, assistant
 
-    model = llm.get_model("claude-opus-5")
+    model = get_model(model_id)
     p = llm.Prompt(
         None,
         model=model,
@@ -1051,10 +1055,14 @@ def test_mid_conversation_system_message_sent_inline():
     ]
 
 
-def test_mid_conversation_system_message_rejected_on_older_models():
+@pytest.mark.parametrize("model_id", ["claude-sonnet-4.5", "claude-sonnet-5"])
+@pytest.mark.parametrize("get_model", [llm.get_model, llm.get_async_model])
+def test_mid_conversation_system_message_rejected_on_unsupported_models(
+    model_id, get_model
+):
     from llm import system, user, assistant
 
-    model = llm.get_model("claude-sonnet-4.5")
+    model = get_model(model_id)
     p = llm.Prompt(
         None,
         model=model,
@@ -1070,10 +1078,12 @@ def test_mid_conversation_system_message_rejected_on_older_models():
         model.build_kwargs(p, None)
 
 
-def test_leading_system_message_not_duplicated_inline():
+@pytest.mark.parametrize("model_id", ["claude-sonnet-5", "claude-opus-5"])
+@pytest.mark.parametrize("get_model", [llm.get_model, llm.get_async_model])
+def test_leading_system_message_not_duplicated_inline(model_id, get_model):
     from llm import system, user
 
-    model = llm.get_model("claude-opus-5")
+    model = get_model(model_id)
     p = llm.Prompt(
         None,
         model=model,
