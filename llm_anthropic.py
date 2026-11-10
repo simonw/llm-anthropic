@@ -1562,6 +1562,7 @@ class _Shared:
 
     def build_messages(self, prompt, conversation, inline_urls=False) -> list[dict]:
         messages: List[Dict[str, Any]] = []
+        pending_system_messages: list[dict[str, Any]] = []
 
         # Current turn — iterate prompt.messages (auto-synthesized from
         # legacy inputs if messages= was not explicitly passed). In llm
@@ -1570,18 +1571,19 @@ class _Shared:
         # prior turns and break tool-result ordering.
         for index, message in enumerate(prompt.messages):
             if message.role == "system":
-                self._append_system_message(messages, message, index == 0)
+                self._append_system_message(
+                    pending_system_messages, message, index == 0
+                )
             else:
+                previous_count = len(messages)
                 self._append_message(messages, message, inline_urls)
-
-        # The API requires an inline system entry to immediately follow a
-        # user turn (and precede an assistant turn or end the array), but
-        # authors naturally write new instructions before their next user
-        # message - so bubble each system entry past a directly following
-        # user turn.
-        for i in range(len(messages) - 1):
-            if messages[i]["role"] == "system" and messages[i + 1]["role"] == "user":
-                messages[i], messages[i + 1] = messages[i + 1], messages[i]
+                # Defer system updates until user-side messages have merged.
+                # Insert them before an emitted assistant; skipped empty
+                # assistant messages must not split the pending turn.
+                if message.role == "assistant" and len(messages) > previous_count:
+                    messages[-1:-1] = pending_system_messages
+                    pending_system_messages.clear()
+        messages.extend(pending_system_messages)
 
         # Cache control: apply to the last content block of the final
         # user-side turn, matching the pre-upgrade behavior.
