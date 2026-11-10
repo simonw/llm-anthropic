@@ -1290,6 +1290,7 @@ class _Shared:
 
         web_search_tool_result content is a list of result blocks;
         web_fetch_tool_result content is a single result object.
+        mcp_tool_result content can also be a string.
         """
         content = getattr(block, "content", None)
         if isinstance(content, list):
@@ -1302,16 +1303,24 @@ class _Shared:
             )
         elif content is None:
             result_text = ""
+        elif isinstance(content, str):
+            result_text = json.dumps(content)
         else:
             result_text = json.dumps(
                 content if isinstance(content, dict) else content.model_dump()
             )
+        provider_metadata = None
+        if block_type == "mcp_tool_result":
+            is_error = getattr(block, "is_error", None)
+            if isinstance(is_error, bool):
+                provider_metadata = {"anthropic": {"is_error": is_error}}
         return StreamEvent(
             type="tool_result",
             chunk=result_text,
             tool_call_id=getattr(block, "tool_use_id", None),
             server_executed=True,
             tool_name=block_type.removesuffix("_tool_result"),
+            provider_metadata=provider_metadata,
         )
 
     def _block_part_index(self, chunk) -> Optional[int]:
@@ -1444,6 +1453,13 @@ class _Shared:
                 }
                 if content is not None:
                     block["content"] = content
+                is_error = (
+                    anthropic_pm.get("is_error")
+                    if isinstance(anthropic_pm, dict)
+                    else None
+                )
+                if part.name == "mcp" and isinstance(is_error, bool):
+                    block["is_error"] = is_error
                 return block
             return {
                 "type": "tool_result",
