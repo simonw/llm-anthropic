@@ -1681,7 +1681,7 @@ class _Shared:
                     )
                 kwargs["thinking"] = {"type": "disabled"}
             elif prompt.options.thinking or thinking_effort_enabled:
-                if self.supports_adaptive_thinking or thinking_effort_enabled:
+                if self.supports_adaptive_thinking:
                     kwargs["thinking"] = {"type": "adaptive"}
                 else:
                     # Pre-4.6 models: enabled with default budget

@@ -1759,6 +1759,34 @@ def test_thinking_true_enabled_on_pre_46():
     assert kwargs["thinking"] == {"type": "enabled", "budget_tokens": 1024}
 
 
+@pytest.mark.parametrize("async_model", [False, True])
+@pytest.mark.parametrize("thinking", [None, True, False])
+@pytest.mark.parametrize("effort", ["low", "medium", "high"])
+@pytest.mark.parametrize("hide_reasoning", [False, True])
+def test_opus_45_effort_uses_legacy_thinking(
+    async_model, thinking, effort, hide_reasoning
+):
+    get_model = llm.get_async_model if async_model else llm.get_model
+    model = get_model("claude-opus-4.5")
+    prompt = llm.Prompt(
+        "Hi",
+        model,
+        options=model.Options(thinking=thinking, thinking_effort=effort),
+        hide_reasoning=hide_reasoning,
+    )
+    kwargs = model.build_kwargs(prompt, None)
+    expected = (
+        {"type": "disabled"}
+        if thinking is False
+        else {"type": "enabled", "budget_tokens": 1024}
+    )
+    if hide_reasoning and thinking is not False:
+        expected["display"] = "omitted"
+    assert kwargs["thinking"] == expected
+    assert kwargs["output_config"]["effort"] == effort
+    assert "effort-2025-11-24" in kwargs["betas"]
+
+
 def test_thinking_false_sends_disabled():
     model = llm.get_model("claude-sonnet-5")
     prompt = llm.Prompt("Hi", model, options=model.Options(thinking=False))
