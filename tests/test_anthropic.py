@@ -7,6 +7,415 @@ import pytest
 from inline_snapshot import snapshot
 from llm_anthropic import ClaudeOptions
 from pydantic import BaseModel
+import yaml
+
+
+@pytest.fixture
+def configured_gateways(user_path, monkeypatch):
+    entries = [
+        {
+            "model_id": "gateway-a",
+            "model_name": "shared-wire-model",
+            "api_base": "http://gateway-a.test/a",
+            "api_key_name": "key-a",
+            "aliases": ["short-a"],
+        },
+        {
+            "model_id": "gateway-b",
+            "model_name": "shared-wire-model",
+            "api_base": "http://gateway-b.test/b",
+            "api_key_name": "key-b",
+            "aliases": ["short-b"],
+        },
+    ]
+    (user_path / "extra-anthropic-models.yaml").write_text(yaml.safe_dump(entries))
+    (user_path / "keys.json").write_text(
+        json.dumps(
+            {
+                "key-a": "fake-key-a",
+                "key-b": "fake-key-b",
+                "override": "fake-override",
+                "anthropic": "fake-official-stored",
+            }
+        )
+    )
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "fake-official-environment")
+    monkeypatch.setenv("ANTHROPIC_BASE_URL", "http://wrong-global.test")
+    return entries
+
+
+def gateway_event_stream(model, text):
+    events = [
+        {
+            "type": "message_start",
+            "message": {
+                "id": "msg-local",
+                "type": "message",
+                "role": "assistant",
+                "model": model,
+                "content": [],
+                "stop_reason": None,
+                "stop_sequence": None,
+                "usage": {"input_tokens": 7, "output_tokens": 0},
+            },
+        },
+        {
+            "type": "content_block_start",
+            "index": 0,
+            "content_block": {"type": "text", "text": ""},
+        },
+        {
+            "type": "content_block_delta",
+            "index": 0,
+            "delta": {"type": "text_delta", "text": text},
+        },
+        {"type": "content_block_stop", "index": 0},
+        {
+            "type": "message_delta",
+            "delta": {"stop_reason": "end_turn", "stop_sequence": None},
+            "usage": {"output_tokens": 2},
+        },
+        {"type": "message_stop"},
+    ]
+    return "".join(
+        "event: {}\ndata: {}\n\n".format(event["type"], json.dumps(event))
+        for event in events
+    ).encode()
+
+
+@pytest.fixture
+def gateway_requests(monkeypatch):
+    import anthropic
+    import httpx2
+
+    calls = []
+
+    def handle(request):
+        assert request.url.host in ("gateway-a.test", "gateway-b.test")
+        body = json.loads(request.content)
+        calls.append(
+            {
+                "url": str(request.url),
+                "key": request.headers["x-api-key"],
+                "body": body,
+            }
+        )
+        label = request.url.host.split(".")[0]
+        if request.url.path.endswith("/count_tokens"):
+            return httpx2.Response(200, json={"input_tokens": 17})
+        assert body["stream"] is True
+        return httpx2.Response(
+            200,
+            headers={"Content-Type": "text/event-stream"},
+            content=gateway_event_stream(body["model"], "Hello from " + label),
+        )
+
+    def sync_client(**kwargs):
+        return anthropic.Anthropic(
+            **kwargs,
+            max_retries=0,
+            http_client=httpx2.Client(transport=httpx2.MockTransport(handle)),
+        )
+
+    def async_client(**kwargs):
+        return anthropic.AsyncAnthropic(
+            **kwargs,
+            max_retries=0,
+            http_client=httpx2.AsyncClient(transport=httpx2.MockTransport(handle)),
+        )
+
+    monkeypatch.setattr(llm_anthropic, "Anthropic", sync_client)
+    monkeypatch.setattr(llm_anthropic, "AsyncAnthropic", async_client)
+    return calls
+
+
+@pytest.mark.parametrize("stream", [False, True])
+def test_custom_sync_requests(configured_gateways, gateway_requests, stream):
+    for name in ("gateway-a", "short-b"):
+        model = llm.get_model(name)
+        label = "gateway-a" if name == "gateway-a" else "gateway-b"
+        response = model.prompt("hello", stream=stream)
+        assert response.text() == "Hello from " + label
+        assert model.model_id == "anthropic/" + label
+    assert [c["url"] for c in gateway_requests] == [
+        "http://gateway-a.test/a/v1/messages",
+        "http://gateway-b.test/b/v1/messages",
+    ]
+    assert [c["key"] for c in gateway_requests] == ["fake-key-a", "fake-key-b"]
+    assert all(c["body"]["model"] == "shared-wire-model" for c in gateway_requests)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("stream", [False, True])
+async def test_custom_async_requests(configured_gateways, gateway_requests, stream):
+    for name in ("short-a", "anthropic/gateway-b"):
+        model = llm.get_async_model(name)
+        label = "gateway-a" if name == "short-a" else "gateway-b"
+        response = model.prompt("hello", stream=stream)
+        assert await response.text() == "Hello from " + label
+        assert model.model_id == "anthropic/" + label
+    assert [c["url"] for c in gateway_requests] == [
+        "http://gateway-a.test/a/v1/messages",
+        "http://gateway-b.test/b/v1/messages",
+    ]
+    assert [c["key"] for c in gateway_requests] == ["fake-key-a", "fake-key-b"]
+    assert all(c["body"]["model"] == "shared-wire-model" for c in gateway_requests)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("async_", [False, True])
+async def test_custom_wire_models_are_independent(
+    configured_gateways, gateway_requests, user_path, async_
+):
+    configured_gateways[1]["model_name"] = "another-wire-model"
+    (user_path / "extra-anthropic-models.yaml").write_text(
+        yaml.safe_dump(configured_gateways)
+    )
+    get_model = llm.get_async_model if async_ else llm.get_model
+    for name in ("gateway-a", "gateway-b"):
+        response = get_model(name).prompt("hello", stream=False)
+        if async_:
+            await response.text()
+        else:
+            response.text()
+    assert [c["body"]["model"] for c in gateway_requests] == [
+        "shared-wire-model",
+        "another-wire-model",
+    ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("async_", [False, True])
+async def test_custom_missing_named_key(
+    configured_gateways, user_path, monkeypatch, async_
+):
+    (user_path / "keys.json").write_text(
+        json.dumps({"anthropic": "fake-official-stored"})
+    )
+
+    def unexpected_client(**kwargs):
+        raise AssertionError("SDK client created without the named key")
+
+    monkeypatch.setattr(llm_anthropic, "Anthropic", unexpected_client)
+    monkeypatch.setattr(llm_anthropic, "AsyncAnthropic", unexpected_client)
+    get_model = llm.get_async_model if async_ else llm.get_model
+    model = get_model("gateway-a")
+    with pytest.raises(llm.NeedsKeyException):
+        response = model.prompt("hello")
+        if async_:
+            await response.text()
+        else:
+            response.text()
+
+
+def test_custom_cli_defaults_override_and_logs(configured_gateways, gateway_requests):
+    from click.testing import CliRunner
+    from llm.cli import cli
+
+    runner = CliRunner()
+    for name, limit in (("gateway-a", "64"), ("gateway-b", "128")):
+        result = runner.invoke(
+            cli, ["models", "options", "set", name, "max_tokens", limit]
+        )
+        assert result.exit_code == 0, result.output
+    for name, extra in (
+        ("short-a", []),
+        ("short-b", ["--async"]),
+        ("gateway-a", ["--key", "override"]),
+    ):
+        result = runner.invoke(cli, ["-m", name, "hello", "--no-stream", *extra])
+        assert result.exit_code == 0, result.output
+    assert [c["key"] for c in gateway_requests] == [
+        "fake-key-a",
+        "fake-key-b",
+        "fake-override",
+    ]
+    assert [c["body"]["max_tokens"] for c in gateway_requests] == [64, 128, 64]
+    assert [c["body"]["model"] for c in gateway_requests] == ["shared-wire-model"] * 3
+    result = runner.invoke(cli, ["logs", "--json"])
+    assert result.exit_code == 0, result.output
+    assert {row["model"] for row in json.loads(result.output)} == {
+        "anthropic/gateway-a",
+        "anthropic/gateway-b",
+    }
+    assert "fake-key-" not in result.output
+    assert "fake-override" not in result.output
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("async_", [False, True])
+async def test_custom_count_tokens(configured_gateways, gateway_requests, async_):
+    get_model = llm.get_async_model if async_ else llm.get_model
+    model = get_model("gateway-a")
+    count = model.count_tokens("hello")
+    assert (await count if async_ else count) == 17
+    assert (
+        gateway_requests[0]["url"] == "http://gateway-a.test/a/v1/messages/count_tokens"
+    )
+    assert gateway_requests[0]["key"] == "fake-key-a"
+    assert gateway_requests[0]["body"]["model"] == "shared-wire-model"
+
+
+def test_custom_registration_is_local(configured_gateways, user_path, monkeypatch):
+    def unexpected_client(**kwargs):
+        raise AssertionError("SDK client created during model registration")
+
+    monkeypatch.setattr(llm_anthropic, "Anthropic", unexpected_client)
+    monkeypatch.setattr(llm_anthropic, "AsyncAnthropic", unexpected_client)
+    cache = user_path / "anthropic_models.json"
+    cache.write_text(json.dumps({"data": [{"id": "claude-future-99"}]}))
+    before = cache.read_bytes()
+    assert llm.get_model("gateway-a").needs_key == "key-a"
+    assert llm.get_async_model("short-b").key_env_var is None
+    builtin = llm.get_model("claude-opus-5")
+    assert builtin.base_url is None
+    assert builtin.needs_key == "anthropic"
+    assert builtin.key_env_var == "ANTHROPIC_API_KEY"
+    assert llm.get_model("claude-future-99").base_url is None
+    assert cache.read_bytes() == before
+
+
+def test_custom_wire_id_does_not_hide_refreshed_models(
+    configured_gateways, user_path, monkeypatch
+):
+    import anthropic
+    import httpx2
+    from click.testing import CliRunner
+    from llm.cli import cli
+
+    entries = configured_gateways
+    entries[0]["model_name"] = "claude-future-99"
+    (user_path / "extra-anthropic-models.yaml").write_text(yaml.safe_dump(entries))
+    monkeypatch.setenv("ANTHROPIC_BASE_URL", "http://default-api.test")
+    calls = []
+
+    def handle(request):
+        calls.append(str(request.url))
+        assert request.url.host == "default-api.test"
+        assert request.url.path == "/v1/models"
+        assert request.headers["x-api-key"] == "fake-official-stored"
+        return httpx2.Response(
+            200,
+            json={
+                "data": [
+                    {"id": "claude-future-99", "created_at": "2026-10-01T00:00:00Z"}
+                ],
+                "has_more": False,
+                "last_id": "claude-future-99",
+            },
+        )
+
+    monkeypatch.setattr(
+        llm_anthropic,
+        "Anthropic",
+        lambda **kwargs: anthropic.Anthropic(
+            **kwargs,
+            max_retries=0,
+            http_client=httpx2.Client(transport=httpx2.MockTransport(handle)),
+        ),
+    )
+    result = CliRunner().invoke(cli, ["anthropic", "refresh"])
+    assert result.exit_code == 0, result.output
+    assert "Added models: claude-future-99" in result.output
+    assert len(calls) == 1
+    assert llm.get_model("gateway-a").claude_model_id == "claude-future-99"
+    assert llm.get_model("claude-future-99").base_url is None
+
+
+@pytest.mark.parametrize("content", ["", "[]", "null"])
+def test_custom_empty_config_preserves_builtin(user_path, content):
+    (user_path / "extra-anthropic-models.yaml").write_text(content)
+    assert llm.get_model("claude-opus-5").needs_key == "anthropic"
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"model_id": ""},
+        {"model_id": " gateway-a"},
+        {"model_name": ""},
+        {"model_name": 42},
+        {"api_base": "not-a-url"},
+        {"api_base": "ftp://gateway.test"},
+        {"api_base": "http://user:inline-secret@gateway.test"},
+        {"api_key_name": ""},
+        {"api_key_name": None},
+        {"api_key": "inline-secret"},
+        {"aliases": "short-a"},
+        {"aliases": [" "]},
+        {"aliases": [" short-a"]},
+        {"aliases": ["gateway-a"]},
+        {"aliases": ["claude-opus-5"]},
+        {"model_id": "claude-opus-5"},
+    ],
+)
+def test_custom_invalid_entry(configured_gateways, user_path, change):
+    import click
+
+    entry = dict(configured_gateways[0], **change)
+    (user_path / "extra-anthropic-models.yaml").write_text(yaml.safe_dump([entry]))
+    emitted = []
+    with pytest.raises(click.ClickException) as caught:
+        llm_anthropic.register_models(lambda *args, **kwargs: emitted.append(args))
+    assert not emitted
+    assert "extra-anthropic-models.yaml" in str(caught.value)
+    assert "inline-secret" not in str(caught.value)
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        "not: a-list",
+        "- not-a-mapping",
+        "- model_id: [",
+        "!!python/object/apply:builtins.print [inline-secret]",
+    ],
+)
+def test_custom_invalid_document(user_path, content):
+    import click
+
+    (user_path / "extra-anthropic-models.yaml").write_text(content)
+    emitted = []
+    with pytest.raises(click.ClickException) as caught:
+        llm_anthropic.register_models(lambda *args, **kwargs: emitted.append(args))
+    assert not emitted
+    assert "inline-secret" not in str(caught.value)
+
+
+def test_custom_duplicate_entries_are_atomic(configured_gateways, user_path):
+    import click
+
+    entries = [configured_gateways[0], configured_gateways[0]]
+    (user_path / "extra-anthropic-models.yaml").write_text(yaml.safe_dump(entries))
+    emitted = []
+    with pytest.raises(click.ClickException):
+        llm_anthropic.register_models(lambda *args, **kwargs: emitted.append(args))
+    assert not emitted
+
+
+@pytest.mark.parametrize("origin", ["sdk", "cache"])
+def test_custom_discovered_collisions(
+    configured_gateways, user_path, monkeypatch, origin
+):
+    import click
+
+    discovered = "claude-future-99"
+    if origin == "sdk":
+        monkeypatch.setattr(llm_anthropic, "sdk_model_ids", lambda: [discovered])
+        configured_gateways[0]["model_id"] = discovered
+    else:
+        (user_path / "anthropic_models.json").write_text(
+            json.dumps({"data": [{"id": discovered}]})
+        )
+        configured_gateways[0]["aliases"] = [discovered]
+    (user_path / "extra-anthropic-models.yaml").write_text(
+        yaml.safe_dump(configured_gateways)
+    )
+    emitted = []
+    with pytest.raises(click.ClickException):
+        llm_anthropic.register_models(lambda *args, **kwargs: emitted.append(args))
+    assert not emitted
+
 
 TINY_PNG = (
     b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\xa6\x00\x00\x01\x1a"
